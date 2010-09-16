@@ -7,19 +7,37 @@ and updates. It is based on the GetCactus tool that was designed for the
 [Cactus Framework][cctk], however GetComponents is designed as a general-purpose
 tool. To use GetComponents, you must have a component list in the Component
 Retrieval Language (CRL), which has been designed in conjunction with
-[GetComponents.
+GetComponents.
 
 Usage
 -----
     ./GetComponents [options] [file]
     ./GetComponents [options] [url]
 
+GetComponents will accept a CRL file specified locally or remotely, in which case
+it will download the remote file. It can checkout and update components (also from a
+specific date), show the status of all components, and do a diff on all components.
+
+For a full overview of the options and the CRL syntax look at the [wiki][]
+or look at the built-in documentation with
+
+    ./GetComponents --man
+
+Example
+-------
+If you want to try GetComponents without building your own component list, try
+checking out the [Einstein Toolkit][et]. It's an open source toolkit for solving
+relativistic equations, and is using GetComponents as its primary means of
+distribution.
+
+    ./GetComponents --anonymous http://svn.einsteintoolkit.org/branches/ET_2010_06/einsteintoolkit.th
+
 Author
 ------
 [Eric Seidel][eseidel]
 
-<eric@eseidel.org>
-
 [eseidel]:http://www.eseidel.org
 [GetComponents]:http://www.eseidel.org/projects/GetComponents
 [cctk]:http://www.cactuscode.org
+[wiki]:http://github.com/gridaphobe/GetComponents/wiki
+[et]:http://www.einsteintoolkit.org
