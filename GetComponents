@@ -3,7 +3,7 @@
 =begin comment
 
 File:           GetComponents
-Version:        $Revision: 695 $
+Version:        1.0
 Author:         Eric Seidel
 Email:          eric@eseidel.org
 Description:    This program automates the procedure of checking out components
