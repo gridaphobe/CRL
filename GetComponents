@@ -1112,6 +1112,11 @@ sub handle_git
         else {print_checkout_info($checkout, $url, $target, $name)}
 
         my($checkout_dir, $checkout_item) = split(/\//, $checkout);
+		unless ($checkout =~ m!/!) {
+			# hack to prevent perl from thinking that a root level link is supposed to
+			# be a directory
+			$checkout_dir = '';
+		}
         # get relative path from target directory to directory containing the repositories
         $git_repos_dir = File::Spec->abs2rel("$orig_dir/$ROOT/repos", "$orig_dir/$target/$checkout_dir");
         # have to chdir to checkout dir for link to work properly
@@ -1403,6 +1408,11 @@ sub handle_darcs
         else {print_checkout_info($checkout, $url, $target, $name)}
 
         my($checkout_dir, $checkout_item) = split(/\//, $checkout);
+		unless ($checkout =~ m!/!) {
+			# hack to prevent perl from thinking that a root level link is supposed to
+			# be a directory
+			$checkout_dir = '';
+		}
         # get relative path from target directory to directory containing the repositories
         $darcs_repos_dir = File::Spec->abs2rel("$orig_dir/$ROOT/repos", "$orig_dir/$target/$checkout_dir");
         # have to chdir to checkout dir for link to work properly
@@ -1685,6 +1695,11 @@ sub handle_hg
         else {print_checkout_info($checkout, $url, $target, $name)}
 
         my($checkout_dir, $checkout_item) = split(/\//, $checkout);
+ 		unless ($checkout =~ m!/!) {
+			# hack to prevent perl from thinking that a root level link is supposed to
+			# be a directory
+			$checkout_dir = '';
+		}
         # get relative path from target directory to directory containing the repositories
         $hg_repos_dir = File::Spec->abs2rel("$orig_dir/$ROOT/repos", "$orig_dir/$target/$checkout_dir");
         # have to chdir to checkout dir for link to work properly
