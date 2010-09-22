@@ -39,44 +39,55 @@ MEGA_VERBOSE = 2
 
 BASE_DIR = os.getcwd()
 
-
 def main():
-    usage = "usage: %prog [options] component_list"
-    parser = OptionParser(usage=usage)
-    parser.add_option("-v", "--verbose", action="count", dest="verbose",
-                        default=0, help="print everything!")
-    parser.add_option("-a", "--anonymous", action="store_true",
-                        dest="anonymous", default=False,
-                        help="use anonymous checkout/update methods")
-    parser.add_option("-u", "--update", action="store_true",
-                        dest="update", default=False,
-                        help="update all existing components")
-    options, args = parser.parse_args()
-    #BASE_DIR = os.getcwd()
-
-    c = ComponentList(options)
+    Options.Build()
+    c = ComponentList()
     for arg in args:
         c.parse(arg)
 
     c.checkout()
-    if options.update:
+    if Options.update:
         c.update()
 
     sys.exit(0)
 
-class ComponentList:
+
+class Options(object):
+    """
+    Provides options globally as static variables.
+    """
+    verbose = 0
+    anonymous = False
+    update = False
+    args = list()
+
+    def Build():
+        """
+        Static method to build options from command line.
+        """
+        usage = "usage: %prog [options] component_list"
+        parser = OptionParser(usage=usage)
+        parser.add_option("-v", "--verbose", action="count", dest="verbose",
+                            default=0, help="print everything!")
+        parser.add_option("-a", "--anonymous", action="store_true",
+                            dest="anonymous", default=False,
+                            help="use anonymous checkout/update methods")
+        parser.add_option("-u", "--update", action="store_true",
+                            dest="update", default=False,
+                            help="update all existing components")
+        options, args = parser.parse_args()
+        Options.verbose = options.verbose
+        Options.anonymous = options.anonymous
+        Options.update = options.update
+        Options.args = args
+    build = staticmethod(build)
+
+class ComponentList(object):
     """
     Class for the Component List itself.
     """
 
-    CVS = None
-    SVN = None
-    GIT = None
-    HG  = None
-    DARCS = None
-
-    def __init__(self, options):
-        self.options = options
+    def __init__(self):
         self.DEFS = {'ROOT' : '.'}
         self.Components = []
         self.ComponentsToCheckout = {}
@@ -180,17 +191,17 @@ class ComponentList:
                 c = None
                 # create a component object
                 if directives['TYPE'] == 'cvs':
-                    c = cvsComponent(self.options, directives)
+                    c = cvsComponent(directives)
                 elif directives['TYPE'] == 'svn':
-                    c = svnComponent(self.options, directives)
+                    c = svnComponent(directives)
                 elif directives['TYPE'] == 'git':
-                    c = gitComponent(self.options, directives)
+                    c = gitComponent(directives)
                 elif directives['TYPE'] == 'hg':
-                    c = hgComponent(self.options, directives)
+                    c = hgComponent(directives)
                 elif directives['TYPE'] == 'darcs':
-                    c = darcsComponent(self.options, directives)
+                    c = darcsComponent(directives)
                 elif directives['TYPE'] in ['http', 'https', 'ftp']:
-                    c = webComponent(self.options, directives)
+                    c = webComponent(directives)
                 else:
                     raise InvalidTypeError(directives['TYPE'])
 
@@ -234,13 +245,13 @@ class ComponentList:
                 c.update()
 
 
-class Component:
+class Component(object):
     """
     Base class for components. Provides __init__(), __str__(),
     and exists() methods.
     """
 
-    def __init__(self, options, directives):
+    def __init__(self, directives):
         # initialize all possible attributes
         self.TARGET = None
         self.TYPE = None
@@ -261,8 +272,6 @@ class Component:
             if not hasattr(self, k):
                 raise InvalidDirectiveError(k)
             setattr(self, k, v)
-
-        self.options = options
 
         # DIR = defined(NAME) ? NAME : CHECKOUT
         if self.NAME is not None:
@@ -359,16 +368,18 @@ class cvsComponent(Component):
     Provides additional checkout(), update(), and authenticate() methods
     """
 
-    def __init(self, options, directives):
-        Component.__init__(self, options, directives)
+    CVS = None
 
-        if ComponentList.CVS is None:
-            if run_command("cvs --help", QUIET) is not None:
-                ComponentList.CVS = "cvs"
+    def __init(self, directives):
+        Component.__init__(self, directives)
+
+        if cvsComponent.CVS is None:
+            if run_command("cvs --help", QUIET):
+                cvsComponent.CVS = "cvs"
             else:
-                ComponentList.CVS = raw_input("Could not find cvs. Please enter the path: ")
-                while run_command("cvs --help", QUIET) is not None:
-                    ComponentList.CVS = raw_input("Bad path. Try again: ")
+                cvsComponent.CVS = raw_input("Could not find cvs. Please enter the path: ")
+                while not run_command("cvs --help", QUIET):
+                    cvsComponent.CVS = raw_input("Bad path. Try again: ")
 
     def exists(self):
         if self.NAME is not None:
@@ -392,21 +403,24 @@ class svnComponent(Component):
     Provides additional checkout(), update(), and authenticate() methods.
     Overloads exists() method.
     """
-    def __init__(self, options, directives):
-        Component.__init__(self, options, directives)
+
+    SVN = None
+
+    def __init__(self, directives):
+        Component.__init__(self, directives)
 
         if self.USER is not None:
             self.USER = "--username %s" % self.USER
         else:
             self.USER = ''
 
-        if ComponentList.SVN is None:
-            if run_command("svn --help", QUIET) is not None:
-                ComponentList.SVN = "svn"
+        if svnComponent.SVN is None:
+            if run_command("svn --help", QUIET):
+                svnComponent.SVN = "svn"
             else:
-                ComponentList.SVN = raw_input("Could not find svn. Please enter the path: ")
-                while run_command("svn --help", QUIET) is not None:
-                    ComponentList.SVN = raw_input("Bad path. Try again: ")
+                svnComponent.SVN = raw_input("Could not find svn. Please enter the path: ")
+                while not run_command("svn --help", QUIET):
+                    svnComponent.SVN = raw_input("Bad path. Try again: ")
 
     def exists(self):
         if self.NAME is not None:
@@ -427,7 +441,7 @@ class svnComponent(Component):
         cmd = "%s checkout %s %s %s %s" % (SVN, self.USER, self.DATE, self.URL,
                             os.path.join(BASE_DIR, self.TARGET, self.DIR))
         print_checkout_info(self.CHECKOUT, self.URL, self.TARGET, self.NAME)
-        if run_command(cmd, self.options.verbose):
+        if run_command(cmd):
             return True
         else:
             return False
@@ -436,7 +450,7 @@ class svnComponent(Component):
         cmd = "%s update %s" % (SVN, os.path.join(
                                 BASE_DIR, self.TARGET, self.DIR))
         print_update_info(self.CHECKOUT, self.URL, self.TARGET, self.NAME)
-        if run_command(cmd, self.options.verbose):
+        if run_command(cmd):
             return True
         else:
             return False
@@ -447,7 +461,11 @@ class gitComponent(Component):
     Extends Component class for use with git.
     Provides additional checkout(), update(), and authenticate() methods
     """
-    pass
+
+    GIT = None
+
+    def __init__(self, directives):
+        Component.__init__(self, directives)
 
 
 class hgComponent(Component):
@@ -472,8 +490,8 @@ class webComponent(Component):
     Provides additional checkout() and update() methods
     """
 
-    def __init__(self, options, directives):
-        Component.__init__(self, options, directives)
+    def __init__(self, directives):
+        Component.__init__(self, directives)
 
     def checkout(self):
 
@@ -567,7 +585,7 @@ def print_update_info(checkout, url, target, name):
     print msg
 
 
-def run_command(cmd, verbose):
+def run_command(cmd, verbose=Options.verbose):
     if cmd == '':
         return
 
@@ -581,7 +599,11 @@ def run_command(cmd, verbose):
             if re.match('^cvs|^svn|^error|^fatal|^abort', line):
                 err = err + line
             print line
-        return out.close()
+        ret = out.close()
+        if ret is None:
+            return True
+        else:
+            return False
 
     elif verbose == 1 and not re.match('^ln|^mkdir|^mv|^rm|^rmdir|^which', cmd):
         out = os.popen(cmd+" 2>&1 1>/dev/null")
@@ -590,7 +612,11 @@ def run_command(cmd, verbose):
             if re.match('^cvs|^svn|^error|^fatal|^abort', line):
                 err = err + line
             print line
-        return out.close()
+        ret = out.close()
+        if ret is None:
+            return True
+        else:
+            return False
 
     else:
         out = os.popen(cmd+" 2>&1")
@@ -599,7 +625,11 @@ def run_command(cmd, verbose):
             if re.match('^cvs|^svn|^error|^fatal|^abort', line):
                 err = err + line
                 print line
-        return out.close()
+        ret = out.close()
+        if ret is None:
+            return True
+        else:
+            return False
 
 
 #############################################################
