@@ -29,6 +29,7 @@ from optparse import OptionParser
 import sys
 import re
 import os
+import shutil
 import urllib2
 from pprint import pprint
 from Queue import Queue
@@ -80,7 +81,7 @@ class Options(object):
         Options.anonymous = options.anonymous
         Options.update = options.update
         Options.args = args
-    build = staticmethod(build)
+    Build = staticmethod(Build)
 
 class ComponentList(object):
     """
@@ -395,6 +396,20 @@ class cvsComponent(Component):
 
         else:
             return False
+
+    def checkout(self):
+        tmpdir = ".GetComponents-tmp-%s" % os.getpid()
+        shutil.rmtree(tmpdir)
+        cmd = [CVS, "-q -d", self.URL, "checkout -d", tmpdir, self.CHECKOUT]
+        print_checkout_info(self.CHECKOUT, self.URL, self.TARGET, self.NAME)
+        if not run_command(cmd):
+            print "Could not checkout %s." % self.DIR
+            return False
+        os.makedirs(self.DIR)
+        cmd = "mv %s/* %s" % (tmpdir, self.NAME)
+        shutil.rmtree(tmpdir)
+        return True
+
 
 
 class svnComponent(Component):

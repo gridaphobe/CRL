@@ -1,2 +1,3 @@
 wiki
+*.pyc
 .DS_Store
