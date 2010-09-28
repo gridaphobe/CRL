@@ -131,7 +131,7 @@ GetOptions('verbose+'       => \$VERBOSE,
            'anonymous'      => \$ANONYMOUS_CHECKOUT,
            'update'         => \$DO_UPDATES,
            'root=s'         => \$ROOT,
-           'date=s'			=> \$DATE,
+           'date=s'         => \$DATE,
            'experimental'   => \$EXPERIMENTAL,
            'status'         => \$STATUS,
            'diff'           => \$DIFF,
@@ -1089,12 +1089,12 @@ sub handle_git
             $cmd = "$git clone$shallow $url $orig_dir/$ROOT/repos/$git_repo";
             print_checkout_info($checkout, $url, $target, $name);
             run_command($cmd) == 0 or push (@components_error, $checkout);
-			if (defined $branch) {
-				chdir("$orig_dir/$ROOT/repos/$git_repo");
-				run_command("git checkout --track -b $branch origin/$branch") == 0 or push (@components_error, $checkout);
-				#run_command("git checkout $date") == 0 or push (@components_error, $checkout);
-				chdir("$orig_dir");
-			}
+            if (defined $branch) {
+                chdir("$orig_dir/$ROOT/repos/$git_repo");
+                run_command("git checkout --track -b $branch origin/$branch") == 0 or push (@components_error, $checkout);
+                #run_command("git checkout $date") == 0 or push (@components_error, $checkout);
+                chdir("$orig_dir");
+            }
             $updated_git_repos{$git_repo} = 1;
         }
         # if git repo has already been cloned, we will pull the latest version
@@ -1102,7 +1102,7 @@ sub handle_git
             #chdir("$orig_dir/$ROOT/repos/$git_repo");
             print_checkout_info($checkout, $url, $target, $name);
             run_command("$git --git-dir=$repo_loc pull -a") == 0 or push (@components_error, $checkout);
-			#run_command("git checkout $date") == 0 or push (@components_error, $checkout);
+            #run_command("git checkout $date") == 0 or push (@components_error, $checkout);
 
             $updated_git_repos{$git_repo} = 1;
             #chdir($orig_dir)
@@ -1112,12 +1112,12 @@ sub handle_git
         else {print_checkout_info($checkout, $url, $target, $name)}
 
         my($checkout_dir, $checkout_item) = split(/\//, $checkout);
-		unless ($checkout =~ m!/!) {
-			# if $checkout does not contain a '/', the item to be checked
-			# out will be placed in $checkout_dir instead of $checkout_item,
-			# breaking the relative path for the symlink
-			$checkout_dir = '';
-		}
+        unless ($checkout =~ m!/!) {
+            # if $checkout does not contain a '/', the item to be checked
+            # out will be placed in $checkout_dir instead of $checkout_item,
+            # breaking the relative path for the symlink
+            $checkout_dir = '';
+        }
         # get relative path from target directory to directory containing the repositories
         $git_repos_dir = File::Spec->abs2rel("$orig_dir/$ROOT/repos", "$orig_dir/$target/$checkout_dir");
         # have to chdir to checkout dir for link to work properly
@@ -1173,11 +1173,11 @@ sub handle_git
                 $semaphores{$git_repo}->down();
             }
 
-        	if (! -e "$orig_dir/$ROOT/repos/$git_repo" && -e "$orig_dir/$ROOT/git-repos/$git_repo") {
-        		run_command("mkdir -p $orig_dir/$ROOT/repos");
-        		chdir("$orig_dir/$ROOT/repos");
-        		run_command("ln -s ../git-repos/$git_repo $git_repo")
-        	}
+            if (! -e "$orig_dir/$ROOT/repos/$git_repo" && -e "$orig_dir/$ROOT/git-repos/$git_repo") {
+                run_command("mkdir -p $orig_dir/$ROOT/repos");
+                chdir("$orig_dir/$ROOT/repos");
+                run_command("ln -s ../git-repos/$git_repo $git_repo")
+            }
             chdir($orig_dir);
             print_update_info($checkout, $url, $target, $name);
             my $err = run_command("$git --git-dir=$repo_loc pull -a");
@@ -1409,12 +1409,12 @@ sub handle_darcs
         else {print_checkout_info($checkout, $url, $target, $name)}
 
         my($checkout_dir, $checkout_item) = split(/\//, $checkout);
-		unless ($checkout =~ m!/!) {
-			# if $checkout does not contain a '/', the item to be checked
-			# out will be placed in $checkout_dir instead of $checkout_item,
-			# breaking the relative path for the symlink
-			$checkout_dir = '';
-		}
+        unless ($checkout =~ m!/!) {
+            # if $checkout does not contain a '/', the item to be checked
+            # out will be placed in $checkout_dir instead of $checkout_item,
+            # breaking the relative path for the symlink
+            $checkout_dir = '';
+        }
         # get relative path from target directory to directory containing the repositories
         $darcs_repos_dir = File::Spec->abs2rel("$orig_dir/$ROOT/repos", "$orig_dir/$target/$checkout_dir");
         # have to chdir to checkout dir for link to work properly
@@ -1470,11 +1470,11 @@ sub handle_darcs
             if ($PARALLEL) {
                 $semaphores{$darcs_repo}->down();
             }
-        	if (! -e "$orig_dir/$ROOT/repos/$darcs_repo" && -e "$orig_dir/$ROOT/darcs-repos/$darcs_repo") {
-        		run_command("mkdir -p $orig_dir/$ROOT/repos");
-        		chdir("$orig_dir/$ROOT/repos");
-        		run_command("ln -s ../darcs-repos/$darcs_repo $darcs_repo")
-        	}
+            if (! -e "$orig_dir/$ROOT/repos/$darcs_repo" && -e "$orig_dir/$ROOT/darcs-repos/$darcs_repo") {
+                run_command("mkdir -p $orig_dir/$ROOT/repos");
+                chdir("$orig_dir/$ROOT/repos");
+                run_command("ln -s ../darcs-repos/$darcs_repo $darcs_repo")
+            }
             chdir($orig_dir);
             print_update_info($checkout, $url, $target, $name);
             my $err = run_command("$darcs pull --repodir=$repo_loc");
@@ -1648,10 +1648,10 @@ sub handle_hg
     my $hg_repo = $component{"HG_REPO"};
     my $cmd = '';
     my $hg_repos_dir = '';
-	my $branch = defined($component{REPO_BRANCH}) ? $component{REPO_BRANCH} : undef;
-	my $date = defined $DATE ? '-d '.$DATE : undef;
+    my $branch = defined($component{REPO_BRANCH}) ? $component{REPO_BRANCH} : undef;
+    my $date = defined $DATE ? '-d '.$DATE : undef;
 
-	my $repo_loc = "$orig_dir/$ROOT/repos/$hg_repo";
+    my $repo_loc = "$orig_dir/$ROOT/repos/$hg_repo";
 
     if ($method eq 'checkout') {
         if ($PARALLEL) {
@@ -1665,16 +1665,16 @@ sub handle_hg
             $cmd = "$hg clone $url $repo_loc";
             print_checkout_info($checkout, $url, $target, $name);
             run_command($cmd) == 0 or push (@components_error, $checkout);
-			if (defined($branch)) {
-				#chdir("$hg_repo");
-				run_command("hg --repository $repo_loc checkout $branch") == 0 or push (@components_error, $checkout);
-				#chdir("..");
-			}
-			if (defined $date) {
-				#chdir("$hg_repo");
-				run_command("hg --repository $repo_loc checkout --date $date") == 0 or push (@components_error, $checkout);
-				#chdir("..");
-			}
+            if (defined($branch)) {
+                #chdir("$hg_repo");
+                run_command("hg --repository $repo_loc checkout $branch") == 0 or push (@components_error, $checkout);
+                #chdir("..");
+            }
+            if (defined $date) {
+                #chdir("$hg_repo");
+                run_command("hg --repository $repo_loc checkout --date $date") == 0 or push (@components_error, $checkout);
+                #chdir("..");
+            }
             $updated_hg_repos{$hg_repo} = 1;
             #chdir($orig_dir);
         }
@@ -1683,12 +1683,12 @@ sub handle_hg
             #chdir("$orig_dir/$ROOT/repos/$hg_repo");
             print_checkout_info($checkout, $url, $target, $name);
             run_command("$hg --repository $repo_loc pull") == 0 or push (@components_error, $checkout);
-			if (defined($branch)) {
-				run_command("hg --repository $repo_loc checkout $branch") == 0 or push (@components_error, $checkout);
-			}
-			if (defined $date) {
-				run_command("hg --repository $repo_loc checkout --date $date") == 0 or push (@components_error, $checkout);
-			}
+            if (defined($branch)) {
+                run_command("hg --repository $repo_loc checkout $branch") == 0 or push (@components_error, $checkout);
+            }
+            if (defined $date) {
+                run_command("hg --repository $repo_loc checkout --date $date") == 0 or push (@components_error, $checkout);
+            }
             $updated_hg_repos{$hg_repo} = 1;
             #chdir($orig_dir);
         }
@@ -1697,12 +1697,12 @@ sub handle_hg
         else {print_checkout_info($checkout, $url, $target, $name)}
 
         my($checkout_dir, $checkout_item) = split(/\//, $checkout);
- 		unless ($checkout =~ m!/!) {
-			# if $checkout does not contain a '/', the item to be checked
-			# out will be placed in $checkout_dir instead of $checkout_item,
-			# breaking the relative path for the symlink
-			$checkout_dir = '';
-		}
+        unless ($checkout =~ m!/!) {
+            # if $checkout does not contain a '/', the item to be checked
+            # out will be placed in $checkout_dir instead of $checkout_item,
+            # breaking the relative path for the symlink
+            $checkout_dir = '';
+        }
         # get relative path from target directory to directory containing the repositories
         $hg_repos_dir = File::Spec->abs2rel("$orig_dir/$ROOT/repos", "$orig_dir/$target/$checkout_dir");
         # have to chdir to checkout dir for link to work properly
@@ -1758,21 +1758,21 @@ sub handle_hg
             if ($PARALLEL) {
                 $semaphores{$hg_repo}->down();
             }
-        	if (! -e "$orig_dir/$ROOT/repos/$hg_repo" && -e "$orig_dir/$ROOT/hg-repos/$hg_repo") {
-        		run_command("mkdir -p $orig_dir/$ROOT/repos");
-        		chdir("$orig_dir/$ROOT/repos");
-        		run_command("ln -s ../hg-repos/$hg_repo $hg_repo")
-        	}
+            if (! -e "$orig_dir/$ROOT/repos/$hg_repo" && -e "$orig_dir/$ROOT/hg-repos/$hg_repo") {
+                run_command("mkdir -p $orig_dir/$ROOT/repos");
+                chdir("$orig_dir/$ROOT/repos");
+                run_command("ln -s ../hg-repos/$hg_repo $hg_repo")
+            }
             chdir($orig_dir);
             print_update_info($checkout, $url, $target, $name);
             my $err = run_command("$hg --repository $repo_loc pull --update");
             if ($err) {push (@components_error, $checkout);}
-			if (defined($branch)) {
-				run_command("hg --repository $repo_loc checkout $branch") == 0 or push (@components_error, $checkout);
-			}
-			if (defined($date)) {
-				run_command("hg --repository $repo_loc checkout --date $date") == 0 or push (@components_error, $checkout);
-			}
+            if (defined($branch)) {
+                run_command("hg --repository $repo_loc checkout $branch") == 0 or push (@components_error, $checkout);
+            }
+            if (defined($date)) {
+                run_command("hg --repository $repo_loc checkout --date $date") == 0 or push (@components_error, $checkout);
+            }
             $updated_hg_repos{$hg_repo} = 1;
             #chdir($orig_dir);
 
@@ -1983,9 +1983,9 @@ sub LOG
     if ($log =~ /^$/) {return}
     # move the file at 100KB, so it doesn't get too Long
     if (-e "$crl_dir/crl.log") {
-    	if (stat("$crl_dir/crl.log")->size > 100000) {
-	    	run_command("mv $crl_dir/crl.log $crl_dir/crl.log.old");
-    	}
+        if (stat("$crl_dir/crl.log")->size > 100000) {
+            run_command("mv $crl_dir/crl.log $crl_dir/crl.log.old");
+        }
     }
     open (my $logfile, '>>', "$crl_dir/crl.log") or die $!;
     my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
@@ -2047,7 +2047,7 @@ Options:
 
     --root          override root directory
 
-    --date	    checkout from a specific date
+    --date      checkout from a specific date
 
     --reset-
     authentication  delete authentication files
