@@ -2047,7 +2047,7 @@ Options:
 
     --root          override root directory
 
-    --date      checkout from a specific date
+    --date          checkout from a specific date
 
     --reset-
     authentication  delete authentication files
