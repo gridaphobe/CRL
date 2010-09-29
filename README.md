@@ -32,6 +32,22 @@ distribution.
 
     ./GetComponents --anonymous http://svn.einsteintoolkit.org/branches/ET_2010_06/einsteintoolkit.th
 
+Notes
+-----
+There are 3 scripts in this repository. GetComponents is the main script and
+is fully functional. It is stable and safe to use, however there is also an
+older version in the stable branch, which coincides with the June 2010 release
+of the Einstein Toolkit. 
+
+The other scripts in the master branch are incomplete
+and unstable. py_components.py is an implementation of CRL in Python, which
+eventually will succeed the current Perl implementation when I have time to
+finish it. generateCRL.py is basically a reverse GetComponents script. It will
+analyze the contents of the working directory and generate a CRL file, 
+allowing you to checkout the same items on another computer without having
+to write the CRL yourself. It is very new and only supports svn right now
+(there are still some bugs with svn too).
+
 Author
 ------
 [Eric Seidel][eseidel]
