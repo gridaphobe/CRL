@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 
-# This script attempts to create a file in CRL format listing all versioned
-# components located recursively within the starting directory
+'''
+This script attempts to create a file in CRL format listing all versioned
+components located recursively within the starting directory.
+'''
 
 __author__ = "Eric Seidel <eric@eseidel.org>"
 
@@ -15,7 +17,6 @@ REPOS = dict()
 BASE_DIR = os.getcwd()
 ROOT = os.path.basename(BASE_DIR)
 LAST_URL = 'None'
-LAST_PATH = 'None'
 
 def main():
     
@@ -38,29 +39,69 @@ def main():
 
 
 def process_cvs(root):
-    pass
-
-
-def process_svn(root):
+    '''
+    Takes a known CVS repository and determines the options to check it out.
+    '''
     global LAST_URL
-    global LAST_PATH
     os.chdir(root)
-    root = re.sub(os.path.dirname(BASE_DIR)+os.sep, '', root)
+    root = re.sub("%s%s" % (os.path.dirname(BASE_DIR), os.sep), '', root)
+    f = open(os.path.join('CVS', 'Root'))
+    url = f.read().strip()
+    f.close()
+    # first check for recursive occurrences of CVS
+    if not re.search(LAST_URL, url):
+        # a little odd, but we modify url during this function
+        LAST_URL = url
+        # now check for similar URL structure
+        path = root.split(os.sep)
+        checkout = ''
+        # checkout = common area of path and url
+        while path != []:
+            if re.search(os.path.join(path), url):
+                checkout = os.path.join(path)
+                break
+            else:
+                del path[0]
+        target = re.sub(checkout, '', root)
+        # kill any trailing '/'
+        target = re.sub(os.sep+'$', '', target)
+        # sub in $ROOT if it belongs
+        target = re.sub(r'^%s' % ROOT, r'$ROOT', target)
+        # account for empty checkout (should be '.' then)
+        if checkout == '':
+            checkout = '.'
+        try:
+            REPOS[url]['checkout'].append(checkout)
+        except KeyError:
+            REPOS[url] = {'target' : target, 'type' : 'cvs',
+                         'url' : url, 'checkout' : [checkout]}
+                         
+    os.chdir(BASE_DIR)
+      
+    
+def process_svn(root):
+    '''
+    Takes a known Subversion repository and determines the options
+    to check it out.
+    '''
+    global LAST_URL
+    os.chdir(root)
+    root = re.sub("%s%s" % (os.path.dirname(BASE_DIR), os.sep), '', root)
     pipe = os.popen("svn info")
     for line in pipe:
         if re.match('URL:', line):
             url = re.sub('URL: ', '', line.strip())
-            # first check for recursive occurences of .svn, etc
+            # first check for recursive occurrences of .svn
             if not re.search(LAST_URL, url):
-                # a little odd, but 
+                # a little odd, but we modify url during this function
                 LAST_URL = url
                 # now check for similar URL structure
                 path = root.split(os.sep)
                 checkout = ''
-                # find common area of path and url > checkout
+                # checkout = common area of path and url
                 while path != []:
-                    if re.search(os.sep.join(path), url):
-                        checkout = os.sep.join(path)
+                    if re.search(os.path.join(path), url):
+                        checkout = os.path.join(path)
                         break
                     else:
                         del path[0]
@@ -82,14 +123,9 @@ def process_svn(root):
                 except KeyError:
                     REPOS[url] = {'target' : target, 'type' : 'svn',
                                  'url' : url, 'checkout' : [checkout]}
-                #REPOS[url]['target'] = target
-                #REPOS[url]['type'] = 'svn'
-                #REPOS[url]['url'] = url
-                #REPOS[url]['checkout'] = checkout
                 
-                LAST_PATH = path
     pipe.close()
-
+    os.chdir(BASE_DIR)
 
 def process_git(root):
     pass
