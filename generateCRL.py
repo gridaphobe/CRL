@@ -3,6 +3,8 @@
 # This script attempts to create a file in CRL format listing all versioned
 # components located recursively within the starting directory
 
+__author__ = "Eric Seidel <eric@eseidel.org>"
+
 import os
 import sys
 import re
@@ -50,27 +52,41 @@ def process_svn(root):
             url = re.sub('URL: ', '', line.strip())
             # first check for recursive occurences of .svn, etc
             if not re.search(LAST_URL, url):
+                # a little odd, but 
+                LAST_URL = url
                 # now check for similar URL structure
-                #path = urlparse.urlsplit(url).path
-                #if os.path.commonprefix([LAST_PATH, path]) != '':
-                #    print os.path.commonprefix([LAST_PATH, path])
-                REPOS[url] = dict()
                 path = root.split(os.sep)
                 checkout = ''
                 # find common area of path and url > checkout
                 while path != []:
                     if re.search(os.sep.join(path), url):
                         checkout = os.sep.join(path)
-                        #print checkout
                         break
                     else:
                         del path[0]
                 target = re.sub(checkout, '', root)
-                REPOS[url]['target'] = target
-                REPOS[url]['type'] = 'svn'
-                REPOS[url]['url'] = url
-                REPOS[url]['checkout'] = checkout
-                LAST_URL = url
+                # kill any trailing '/'
+                target = re.sub(os.sep+'$', '', target)
+                # sub in $ROOT if it belongs
+                target = re.sub(r'^%s' % ROOT, r'$ROOT', target)
+                # account for empty checkout (should be '.' then)
+                if checkout == '':
+                    checkout = '.'
+                # insert URL variables
+                for i in range(len(path)):
+                    url = re.sub(path[i], r'$%d' % (i+1), url, count=1)
+                #component = {'target' : target, 'type' : 'svn',
+                #             'url' : url, 'checkout' : checkout}
+                try:
+                    REPOS[url]['checkout'].append(checkout)
+                except KeyError:
+                    REPOS[url] = {'target' : target, 'type' : 'svn',
+                                 'url' : url, 'checkout' : [checkout]}
+                #REPOS[url]['target'] = target
+                #REPOS[url]['type'] = 'svn'
+                #REPOS[url]['url'] = url
+                #REPOS[url]['checkout'] = checkout
+                
                 LAST_PATH = path
     pipe.close()
 
@@ -92,11 +108,14 @@ def print_CRL():
     print "!CRL_VERSION = 1.0"
     print ""
     print "!DEFINE ROOT = %s" % ROOT
+    print ""
     for repo in REPOS:
         print "!TARGET  = %s" % REPOS[repo]['target']
         print "!TYPE    = %s" % REPOS[repo]['type']
         print "!URL     = %s" % REPOS[repo]['url']
-        print "!CHECKOUT= %s" % REPOS[repo]['checkout']
+        print "!CHECKOUT= "
+        for c in REPOS[repo]['checkout']:
+            print c
         print ""
         
 
