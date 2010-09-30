@@ -57,8 +57,8 @@ def process_cvs(root):
         checkout = ''
         # checkout = common area of path and url
         while path != []:
-            if re.search(os.path.join(path), url):
-                checkout = os.path.join(path)
+            if re.search(os.sep.join(path), url):
+                checkout = os.sep.join(path)
                 break
             else:
                 del path[0]
@@ -99,8 +99,8 @@ def process_svn(root):
                 checkout = ''
                 # checkout = common area of path and url
                 while path != []:
-                    if re.search(os.path.join(path), url):
-                        checkout = os.path.join(path)
+                    if re.search(os.sep.join(path), url):
+                        checkout = os.sep.join(path)
                         break
                     else:
                         del path[0]
