@@ -78,7 +78,6 @@ def process_cvs(root):
                          
     os.chdir(BASE_DIR)
       
-    
 def process_svn(root):
     '''
     Takes a known Subversion repository and determines the options
