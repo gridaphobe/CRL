@@ -62,15 +62,24 @@ def process_cvs(root):
         # moving lower into a repository
         return
     
-    path = root.split(os.sep)
+    # now we need to do some clever matching to figure out what
+    # checkout and target should actually be
+    checkout_path = checkout.split(os.sep)
+    target_path = root.split(os.sep)
+    for cpath in checkout_path:
+        if cpath not in target_path:
+            checkout_path.remove(cpath)       
+    checkout = os.sep.join(checkout_path)
+    
+    # now split again to fix target
     checkout_path, checkout_item = os.path.split(checkout)
-    while path != []:
-        if checkout_item in path:
-            path.remove(checkout_item)
+    while target_path != []:
+        if checkout_item in target_path:
+            target_path.remove(checkout_item)
             checkout_path, checkout_item = os.path.split(checkout_path)
         else:
             break
-    target = os.sep.join(path)
+    target = os.sep.join(target_path)
           
     # sub in $ROOT if it belongs
     target = re.sub(r'^%s' % ROOT, r'$ROOT', target)
