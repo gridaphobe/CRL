@@ -17,6 +17,7 @@ REPOS = dict()
 BASE_DIR = os.getcwd()
 ROOT = os.path.basename(BASE_DIR)
 LAST_URL = 'None'
+LAST_PATH = 'None'
 
 def main():
     
@@ -43,39 +44,50 @@ def process_cvs(root):
     Takes a known CVS repository and determines the options to check it out.
     '''
     global LAST_URL
+    global LAST_PATH
     os.chdir(root)
     root = re.sub("%s%s" % (os.path.dirname(BASE_DIR), os.sep), '', root)
+    
+    # get url from CVS/Root
     f = open(os.path.join('CVS', 'Root'))
     url = f.read().strip()
     f.close()
-    # first check for recursive occurrences of CVS
-    if not re.search(LAST_URL, url):
-        # a little odd, but we modify url during this function
-        LAST_URL = url
-        # now check for similar URL structure
-        path = root.split(os.sep)
-        checkout = ''
-        # checkout = common area of path and url
-        while path != []:
-            if re.search(os.sep.join(path), url):
-                checkout = os.sep.join(path)
-                break
-            else:
-                del path[0]
-        target = re.sub(checkout, '', root)
-        # kill any trailing '/'
-        target = re.sub(os.sep+'$', '', target)
-        # sub in $ROOT if it belongs
-        target = re.sub(r'^%s' % ROOT, r'$ROOT', target)
-        # account for empty checkout (should be '.' then)
-        if checkout == '':
-            checkout = '.'
-        try:
-            REPOS[url]['checkout'].append(checkout)
-        except KeyError:
-            REPOS[url] = {'target' : target, 'type' : 'cvs',
-                         'url' : url, 'checkout' : [checkout]}
-                         
+    
+    # get checkout from CVS/Repository
+    f = open(os.path.join('CVS', 'Repository'))
+    checkout = f.read().strip()
+    f.close()
+ 
+    if url == LAST_URL and re.search(LAST_PATH, checkout):
+        # moving lower into a repository
+        return
+    
+    path = root.split(os.sep)
+    checkout_path, checkout_item = os.path.split(checkout)
+    while path != []:
+        if checkout_item in path:
+            path.remove(checkout_item)
+            checkout_path, checkout_item = os.path.split(checkout_path)
+        else:
+            break
+    target = os.sep.join(path)
+          
+    # sub in $ROOT if it belongs
+    target = re.sub(r'^%s' % ROOT, r'$ROOT', target)
+
+    #print target
+    #print checkout
+    #print url
+    #sys.exit(0)
+    
+    try:
+        REPOS[url]['checkout'].append(checkout)
+    except KeyError:
+        REPOS[url] = {'target' : target, 'type' : 'cvs',
+                     'url' : url, 'checkout' : [checkout]}
+           
+    LAST_URL = url
+    LAST_PATH = checkout
     os.chdir(BASE_DIR)
       
 def process_svn(root):
