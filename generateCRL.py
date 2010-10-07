@@ -16,8 +16,8 @@ from pprint import pprint
 REPOS = dict()
 BASE_DIR = os.getcwd()
 ROOT = os.path.basename(BASE_DIR)
-LAST_URL = 'None'
-LAST_PATH = 'None'
+LAST_URL = 'rDjLIYICiziFQNRcFKrhpcdYf8QwAzCLYrNu8JAEPpmRAJamCA'
+LAST_PATH = 'gDaMUCyJvqVjxJhnFHbTQTJevMxDGWqZY4jmaBEQOGkDMss7Ek'
 
 def main():
     
@@ -63,13 +63,13 @@ def process_cvs(root):
         return
     
     # now we need to do some clever matching to figure out what
-    # checkout and target should actually be
-    checkout_path = checkout.split(os.sep)
+    # checkout, name, and target should be
+    #checkout_path = checkout.split(os.sep)
     target_path = root.split(os.sep)
-    for cpath in checkout_path:
-        if cpath not in target_path:
-            checkout_path.remove(cpath)       
-    checkout = os.sep.join(checkout_path)
+    #for cpath in checkout_path:
+    #    if cpath not in target_path:
+    #        checkout_path.remove(cpath)       
+    #name = os.sep.join(checkout_path)
     
     # now split again to fix target
     checkout_path, checkout_item = os.path.split(checkout)
@@ -83,17 +83,14 @@ def process_cvs(root):
           
     # sub in $ROOT if it belongs
     target = re.sub(r'^%s' % ROOT, r'$ROOT', target)
-
-    #print target
-    #print checkout
-    #print url
-    #sys.exit(0)
     
     try:
         REPOS[url]['checkout'].append(checkout)
     except KeyError:
         REPOS[url] = {'target' : target, 'type' : 'cvs',
-                     'url' : url, 'checkout' : [checkout]}
+                     'url' : url, 'checkout' : [checkout]
+                     #, 'name' : name
+                     }
            
     LAST_URL = url
     LAST_PATH = checkout
@@ -148,8 +145,23 @@ def process_svn(root):
     os.chdir(BASE_DIR)
 
 def process_git(root):
-    pass
-
+    '''
+    Takes a known git repository and determines the options to clone it.
+    '''
+    os.chdir(root)
+    print "found git"
+    root = re.sub("%s%s" % (os.path.dirname(BASE_DIR), os.sep), '', root)
+    pipe = os.popen("git remote show -n origin")
+    for line in pipe:
+        if re.search(r'fetch\s+url:', line, flags=re.I):
+            url = re.sub(r'fetch\s+url:\s*', '', line.strip(), flags=re.I)
+            url.strip()
+            target = root
+            checkout = '.'
+            REPOS[url] = {'target' : target, 'type' : 'git',
+                            'url' : url, 'checkout' : [checkout]}
+    pipe.close()
+    os.chdir(BASE_DIR):
 
 def process_hg(root):
     pass
@@ -172,6 +184,10 @@ def print_CRL():
         print "!CHECKOUT= "
         for c in REPOS[repo]['checkout']:
             print c
+        try:
+            print "!NAME    = %s" % REPOS[repo]['name']
+        except KeyError:
+            pass
         print ""
         
 
