@@ -242,7 +242,6 @@ class ComponentList(object):
         for target in keys:
             while not self.ComponentsToUpdate[target].empty():
                 c = self.ComponentsToUpdate[target].get()
-                print c
                 c.update()
 
 
