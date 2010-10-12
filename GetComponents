@@ -367,6 +367,11 @@ sub parse_list
         # turn off warnings for this statement, we do our own checking
         {no warnings 'all'; %rec = @pairs;}
 
+        # skip ignored thorns
+        if ($rec{"TYPE"} =~ /ignore/) {
+            next;
+        }
+        
         if (!defined($rec{"CHECKOUT"})) {
             WARN_nonfatal("Nothing will be checked out from $rec{URL}\n");
             next;
