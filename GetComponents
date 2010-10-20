@@ -1106,7 +1106,7 @@ sub handle_git
         elsif ($updated_git_repos{$git_repo} == 0) {
             #chdir("$orig_dir/$ROOT/repos/$git_repo");
             print_checkout_info($checkout, $url, $target, $name);
-            run_command("$git --git-dir=$repo_loc pull -a") == 0 or push (@components_error, $checkout);
+            run_command("$git --git-dir=$repo_loc pull") == 0 or push (@components_error, $checkout);
             #run_command("git checkout $date") == 0 or push (@components_error, $checkout);
 
             $updated_git_repos{$git_repo} = 1;
@@ -1185,7 +1185,7 @@ sub handle_git
             }
             chdir($orig_dir);
             print_update_info($checkout, $url, $target, $name);
-            my $err = run_command("$git --git-dir=$repo_loc pull -a");
+            my $err = run_command("$git --git-dir=$repo_loc pull");
             if ($err) {push (@components_error, $checkout)}
             $updated_git_repos{$git_repo} = 1;
             #chdir($orig_dir);
