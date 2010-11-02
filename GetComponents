@@ -168,9 +168,8 @@ if ($DO_UPDATES) {
     }
 }
 
-if ($EXPERIMENTAL) {
-  write_componentlist_target();
-}
+write_componentlist_target();
+
 print_summary();
 exit (@components_error > 0);
 
@@ -290,15 +289,13 @@ sub parse_list
         my @lines = <$COMPONENT_LIST>;
         close($COMPONENT_LIST);
         # handle includes
-        if ($EXPERIMENTAL == 1) {
-            my $i = -1;
-            foreach my $line (@lines) {
-                $i++;
-                if ($line =~ /^[^#]*!INCLUDE *= *(.*)$/) {
-                    splice(@lines, $i, 1, &download_include($1));
-                }
-            }
-        }
+		my $i = -1;
+		foreach my $line (@lines) {
+			$i++;
+			if ($line =~ /^[^#]*!INCLUDE *= *(.*)$/) {
+				splice(@lines, $i, 1, &download_include($1));
+			}
+		}
         # grab definitions
         foreach my $line (@lines) {
             if ($line =~ /^!DEFINE\s*([^\s]+)\s*=\s*(.+)/) {
@@ -1963,6 +1960,12 @@ sub print_summary
     if (@components_error == 0) {
         print "  $checkout_size components checked out successfully.\n";
         print "  $update_size components updated successfully.\n\n";
+        my $logmsg = "Updated from thornlist(s): ";
+        $logmsg .= join(' , ', @CRL_LISTS);
+        #for my $list (@CRL_LISTS) {
+        #	$logmsg .= "$list, ";
+        #}
+        &LOG($logmsg);  
     }
     else {
         print "  $checkout_size components checked out.\n";
