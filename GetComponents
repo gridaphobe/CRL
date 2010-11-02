@@ -1093,7 +1093,11 @@ sub handle_git
             run_command($cmd) == 0 or push (@components_error, $checkout);
             if (defined $branch) {
                 chdir("$orig_dir/$ROOT/repos/$git_repo");
-                run_command("git checkout --track -b $branch origin/$branch") == 0 or push (@components_error, $checkout);
+                my $err = run_command("git checkout --track -b $branch origin/$branch");
+                if ($err) {
+                	push (@components_error, $checkout);
+                	return $err;
+                }
                 #run_command("git checkout $date") == 0 or push (@components_error, $checkout);
                 chdir("$orig_dir");
             }
@@ -1103,7 +1107,11 @@ sub handle_git
         elsif ($updated_git_repos{$git_repo} == 0) {
             #chdir("$orig_dir/$ROOT/repos/$git_repo");
             print_checkout_info($checkout, $url, $target, $name);
-            run_command("$git --git-dir=$repo_loc pull") == 0 or push (@components_error, $checkout);
+            my $err = run_command("$git --git-dir=$repo_loc pull");
+			if ($err) {
+				push (@components_error, $checkout);
+				return $err;
+			}
             #run_command("git checkout $date") == 0 or push (@components_error, $checkout);
 
             $updated_git_repos{$git_repo} = 1;
@@ -1395,14 +1403,22 @@ sub handle_darcs
         if (! -e $repo_loc) {
             $cmd = "$darcs clone $url $orig_dir/$ROOT/repos/$darcs_repo";
             print_checkout_info($checkout, $url, $target, $name);
-            run_command($cmd) == 0 or push (@components_error, $checkout);
+            my $err = run_command($cmd);
+			if ($err) {
+				push (@components_error, $checkout);
+				return $err;
+			}
             $updated_darcs_repos{$darcs_repo} = 1;
         }
         # if darcs repo has already been cloned, we will pull the latest version
         elsif ($updated_darcs_repos{$darcs_repo} == 0) {
             #chdir("$orig_dir/$ROOT/repos/$darcs_repo");
             print_checkout_info($checkout, $url, $target, $name);
-            run_command("$darcs pull --repodir=$repo_loc") == 0 or push (@components_error, $checkout);
+            my $err = run_command("$darcs pull --repodir=$repo_loc");
+			if ($err) {
+				push (@components_error, $checkout);
+				return $err;
+			}
             $updated_darcs_repos{$darcs_repo} = 1;
             #chdir($orig_dir)
         }
@@ -1666,7 +1682,11 @@ sub handle_hg
             #chdir("$orig_dir/$ROOT/repos");
             $cmd = "$hg clone $url $repo_loc";
             print_checkout_info($checkout, $url, $target, $name);
-            run_command($cmd) == 0 or push (@components_error, $checkout);
+            my $err = run_command($cmd);
+			if ($err) {
+				push (@components_error, $checkout);
+				return $err;
+			}
             if (defined($branch)) {
                 #chdir("$hg_repo");
                 run_command("hg --repository $repo_loc checkout $branch") == 0 or push (@components_error, $checkout);
@@ -1684,7 +1704,11 @@ sub handle_hg
         elsif ($updated_hg_repos{$hg_repo} == 0) {
             #chdir("$orig_dir/$ROOT/repos/$hg_repo");
             print_checkout_info($checkout, $url, $target, $name);
-            run_command("$hg --repository $repo_loc pull") == 0 or push (@components_error, $checkout);
+            my $err = run_command("$hg --repository $repo_loc pull");
+			if ($err) {
+				push (@components_error, $checkout);
+				return;
+			}
             if (defined($branch)) {
                 run_command("hg --repository $repo_loc checkout $branch") == 0 or push (@components_error, $checkout);
             }
