@@ -78,6 +78,7 @@ my $STATUS = 0;
 my $DIFF = 0;
 my $DATE;
 my @CRL_LISTS;
+my @ORIG_LISTS;
 my %DEFINITIONS;
 my $cvs = 'cvs';
 my $svn = 'svn';
@@ -196,6 +197,8 @@ sub process_args()
     }
     else {
         foreach my $ARG (@ARGV) {
+        	# save original list for log message
+        	push @ORIG_LISTS, $ARG;
             if ($ARG =~ m!^https?://!) {
                 download_list($ARG);
                 $ARG =~ s!.*/!!;
@@ -1985,7 +1988,7 @@ sub print_summary
         print "  $checkout_size components checked out successfully.\n";
         print "  $update_size components updated successfully.\n\n";
         my $logmsg = "Updated from thornlist(s): ";
-        $logmsg .= join(' , ', @CRL_LISTS);
+        $logmsg .= join(' , ', @ORIG_LISTS);
         #for my $list (@CRL_LISTS) {
         #	$logmsg .= "$list, ";
         #}
@@ -1998,7 +2001,10 @@ sub print_summary
             print "  Unable to process $error\n";
         }
         print "\n";
-    }
+        my $logmsg = @components_error . " errors occurred during update from thornlist(s): ";
+        $logmsg .= join(' , ', @ORIG_LISTS);
+        &LOG($logmsg);
+        }
 
     #my $end_time = clock();
     my $elapsed_time = time - $start_time;
