@@ -56,7 +56,8 @@ unless ($@) {
     import Thread::Semaphore;
     #$PARALLEL = 1;
     $QUEUE = Thread::Queue->new();
-
+    # create universal semaphore for any chdir calls
+	$semaphores{'cd'} = Thread::Semaphore->new();
 }
 
 my $combined_components = "# This file was automatically generated using the GetComponents script.\n\n";
@@ -1093,9 +1094,14 @@ sub handle_git
         if (! -e $repo_loc) {
             $cmd = "$git clone$shallow $url $orig_dir/$ROOT/repos/$git_repo";
             print_checkout_info($checkout, $url, $target, $name);
-            run_command($cmd) == 0 or push (@components_error, $checkout);
+            my $err = run_command($cmd);
+            if ($err) {
+            	push (@components_error, $checkout);
+            	return $err;
+            }
             if (defined $branch) {
-                chdir("$orig_dir/$ROOT/repos/$git_repo");
+            	if ($PARALLEL) {$semaphores{'cd'}->down()}
+            	chdir("$orig_dir/$ROOT/repos/$git_repo");
                 my $err = run_command("git checkout --track -b $branch origin/$branch");
                 if ($err) {
                 	push (@components_error, $checkout);
@@ -1103,7 +1109,8 @@ sub handle_git
                 }
                 #run_command("git checkout $date") == 0 or push (@components_error, $checkout);
                 chdir("$orig_dir");
-            }
+                if ($PARALLEL) {$semaphores{'cd'}->up()}
+                }
             $updated_git_repos{$git_repo} = 1;
         }
         # if git repo has already been cloned, we will pull the latest version
@@ -1131,6 +1138,9 @@ sub handle_git
             # breaking the relative path for the symlink
             $checkout_dir = '';
         }
+        
+        if ($PARALLEL) {$semaphores{'cd'}->down()}
+        
         # get relative path from target directory to directory containing the repositories
         $git_repos_dir = File::Spec->abs2rel("$orig_dir/$ROOT/repos", "$orig_dir/$target/$checkout_dir");
         # have to chdir to checkout dir for link to work properly
@@ -1164,6 +1174,8 @@ sub handle_git
             if ($PARALLEL) {
                 $semaphores{$git_repo}->up();
             }
+            chdir($orig_dir);
+            if ($PARALLEL) {$semaphores{'cd'}->up()}
             return $err;
         }
         else {
@@ -1175,6 +1187,8 @@ sub handle_git
             if ($PARALLEL) {
                 $semaphores{$git_repo}->up();
             }
+            chdir($orig_dir);
+            if ($PARALLEL) {$semaphores{'cd'}->up()}
             return $err;
         }
     }
@@ -1184,22 +1198,24 @@ sub handle_git
         if ($updated_git_repos{$git_repo} == 0) {
             if ($PARALLEL) {
                 $semaphores{$git_repo}->down();
+                $semaphores{'cd'}->down();
             }
-
+			
             if (! -e "$orig_dir/$ROOT/repos/$git_repo" && -e "$orig_dir/$ROOT/git-repos/$git_repo") {
                 run_command("mkdir -p $orig_dir/$ROOT/repos");
                 chdir("$orig_dir/$ROOT/repos");
                 run_command("ln -s ../git-repos/$git_repo $git_repo")
             }
-            chdir($orig_dir);
+            chdir("$orig_dir/$ROOT/repos/$git_repo");
             print_update_info($checkout, $url, $target, $name);
-            my $err = run_command("$git --git-dir=$repo_loc pull");
+            my $err = run_command("$git pull");
             if ($err) {push (@components_error, $checkout)}
             $updated_git_repos{$git_repo} = 1;
-            #chdir($orig_dir);
+            chdir($orig_dir);
 
             if ($PARALLEL) {
                 $semaphores{$git_repo}->up();
+                $semaphores{'cd'}->up();
             }
             return $err;
         }
