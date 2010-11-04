@@ -1209,6 +1209,8 @@ sub handle_git
             }
             chdir("$orig_dir/$ROOT/repos/$git_repo");
             print_update_info($checkout, $url, $target, $name);
+            #print cwd()."\n";
+            #print "$orig_dir/$ROOT/repos/$git_repo\n";
             my $err = run_command("$git pull");
             if ($err) {push (@components_error, $checkout)}
             $updated_git_repos{$git_repo} = 1;
@@ -1923,7 +1925,7 @@ sub run_command
         }
         close $output; # to get $?
         my $errno = $?;
-        LOG("Could not run command: $command\n$out") if $errno;
+        LOG("Could not run command: $command\ncwd = ".cwd()."\n$out") if $errno;
         return $errno;
     }
     # if $VERBOSE == 1 we will print the current directory, the command, and
@@ -1941,7 +1943,7 @@ sub run_command
         }
         close $output; # to get $?
         my $errno = $?;
-        LOG("Could not run command: $command\n$out") if $errno;
+        LOG("Could not run command: $command\ncwd = ".cwd()."\n$out") if $errno;
         return $errno;
     }
     # if $VERBOSE == 0 we will suppress all output from the command, except for errors
@@ -1955,7 +1957,7 @@ sub run_command
         }
         close $output; # to get $?
         my $errno = $?;
-        LOG("Could not run command: $command\n$out") if $errno;
+        LOG("Could not run command: $command\ncwd = ".cwd()."\n$out") if $errno;
         return $errno;
    }
 }
