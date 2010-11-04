@@ -42,6 +42,7 @@ use Cwd;
 # import optional threading modules
 my $PARALLEL;
 my %semaphores;
+my $cd_sem;
 my $QUEUE;
 eval {
     require threads;
@@ -57,7 +58,7 @@ unless ($@) {
     #$PARALLEL = 1;
     $QUEUE = Thread::Queue->new();
     # create universal semaphore for any chdir calls
-	$semaphores{'cd'} = Thread::Semaphore->new();
+	$cd_sem = Thread::Semaphore->new();
 }
 
 my $combined_components = "# This file was automatically generated using the GetComponents script.\n\n";
@@ -1100,7 +1101,7 @@ sub handle_git
             	return $err;
             }
             if (defined $branch) {
-            	if ($PARALLEL) {$semaphores{'cd'}->down()}
+            	if ($PARALLEL) {$cd_sem->down()}
             	chdir("$orig_dir/$ROOT/repos/$git_repo");
                 my $err = run_command("git checkout --track -b $branch origin/$branch");
                 if ($err) {
@@ -1109,7 +1110,7 @@ sub handle_git
                 }
                 #run_command("git checkout $date") == 0 or push (@components_error, $checkout);
                 chdir("$orig_dir");
-                if ($PARALLEL) {$semaphores{'cd'}->up()}
+                if ($PARALLEL) {$cd_sem->up()}
                 }
             $updated_git_repos{$git_repo} = 1;
         }
@@ -1139,7 +1140,7 @@ sub handle_git
             $checkout_dir = '';
         }
         
-        if ($PARALLEL) {$semaphores{'cd'}->down()}
+        if ($PARALLEL) {$cd_sem->down()}
         
         # get relative path from target directory to directory containing the repositories
         $git_repos_dir = File::Spec->abs2rel("$orig_dir/$ROOT/repos", "$orig_dir/$target/$checkout_dir");
@@ -1175,7 +1176,7 @@ sub handle_git
                 $semaphores{$git_repo}->up();
             }
             chdir($orig_dir);
-            if ($PARALLEL) {$semaphores{'cd'}->up()}
+            if ($PARALLEL) {$cd_sem->up()}
             return $err;
         }
         else {
@@ -1188,7 +1189,7 @@ sub handle_git
                 $semaphores{$git_repo}->up();
             }
             chdir($orig_dir);
-            if ($PARALLEL) {$semaphores{'cd'}->up()}
+            if ($PARALLEL) {$cd_sem->up()}
             return $err;
         }
     }
@@ -1198,7 +1199,7 @@ sub handle_git
         if ($updated_git_repos{$git_repo} == 0) {
             if ($PARALLEL) {
                 $semaphores{$git_repo}->down();
-                $semaphores{'cd'}->down();
+                $cd_sem->down();
             }
 			
             if (! -e "$orig_dir/$ROOT/repos/$git_repo" && -e "$orig_dir/$ROOT/git-repos/$git_repo") {
@@ -1215,7 +1216,7 @@ sub handle_git
 
             if ($PARALLEL) {
                 $semaphores{$git_repo}->up();
-                $semaphores{'cd'}->up();
+                $cd_sem->up();
             }
             return $err;
         }
