@@ -161,7 +161,7 @@ def process_git(root):
             REPOS[url] = {'target' : target, 'type' : 'git',
                             'url' : url, 'checkout' : [checkout]}
     pipe.close()
-    os.chdir(BASE_DIR):
+    os.chdir(BASE_DIR)
 
 def process_hg(root):
     pass
