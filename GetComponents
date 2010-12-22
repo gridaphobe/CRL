@@ -1091,8 +1091,12 @@ sub handle_git
         }
 
         run_command("mkdir -p $orig_dir/$ROOT/repos");
+        # first check to see if previous attempt at clone failed
+        if ($updated_git_repos{$git_repo} == -1) {
+            return -1;
+        }
         # clone the git repo
-        if (! -e $repo_loc) {
+        elsif (! -e $repo_loc) {
             $cmd = "$git clone$shallow $url $orig_dir/$ROOT/repos/$git_repo";
             print_checkout_info($checkout, $url, $target, $name);
             my $err = run_command($cmd);
@@ -1106,6 +1110,11 @@ sub handle_git
                 my $err = run_command("git checkout --track -b $branch origin/$branch");
                 if ($err) {
                 	push (@components_error, $checkout);
+                	run_command("cd .. && mv $git_repo $git_repo-branch-failed");
+                	$updated_git_repos{$git_repo} = -1;
+                	my $logmsg = "Error: Could not checkout $checkout, unable to switch to branch $branch.";
+                	print "$logmsg\n";
+                	&LOG($logmsg);
                 	return $err;
                 }
                 #run_command("git checkout $date") == 0 or push (@components_error, $checkout);
@@ -1178,8 +1187,20 @@ sub handle_git
             chdir($orig_dir);
             if ($PARALLEL) {$cd_sem->up()}
             return $err;
-        }
-        else {
+        } elsif ($checkout eq '.') {
+            # checkout entire repo
+            $cmd = "ln -s $git_repos_dir/$git_repo $name";
+            if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
+            return if (-e "$name");
+            my $err = run_command($cmd);
+            if ($err) {push (@components_error, $checkout.": symlink error.")}
+            if ($PARALLEL) {
+                $semaphores{$git_repo}->up();
+            }
+            chdir($orig_dir);
+            if ($PARALLEL) {$cd_sem->up()}
+            return $err;
+        } else {
             $cmd = "ln -s $git_repos_dir/$git_repo/$checkout $checkout_item";
             if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
             return if (-e "$checkout_item");
@@ -1421,8 +1442,12 @@ sub handle_darcs
         }
 
         run_command("mkdir -p $orig_dir/$ROOT/repos");
+        # first check to see if previous attempt at clone failed
+        if ($updated_darcs_repos{$darcs_repo} == -1) {
+            return -1;
+        }
         # clone the darcs repo
-        if (! -e $repo_loc) {
+        elsif (! -e $repo_loc) {
             $cmd = "$darcs clone $url $orig_dir/$ROOT/repos/$darcs_repo";
             print_checkout_info($checkout, $url, $target, $name);
             my $err = run_command($cmd);
@@ -1490,8 +1515,20 @@ sub handle_darcs
                 $semaphores{$darcs_repo}->up();
             }
             return $err;
-        }
-        else {
+        } elsif ($checkout eq '.') {
+            # checkout entire repo
+            $cmd = "ln -s $darcs_repos_dir/$darcs_repo $name";
+            if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
+            return if (-e "$name");
+            my $err = run_command($cmd);
+            if ($err) {push (@components_error, $checkout.": symlink error.")}
+            if ($PARALLEL) {
+                $semaphores{$darcs_repo}->up();
+            }
+            chdir($orig_dir);
+            if ($PARALLEL) {$cd_sem->up()}
+            return $err;
+        } else {
             $cmd = "ln -s $darcs_repos_dir/$darcs_repo/$checkout $checkout_item";
             if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
             return if (-e "$checkout_item");
@@ -1699,6 +1736,10 @@ sub handle_hg
         }
 
         run_command("mkdir -p $orig_dir/$ROOT/repos");
+        # first check to see if previous attempt at clone failed
+        if ($updated_hg_repos{$hg_repo} == -1) {
+            return -1;
+        }
         # clone the hg repo
         if (! -e $repo_loc) {
             #chdir("$orig_dir/$ROOT/repos");
@@ -1711,12 +1752,30 @@ sub handle_hg
 			}
             if (defined($branch)) {
                 #chdir("$hg_repo");
-                run_command("hg --repository $repo_loc checkout $branch") == 0 or push (@components_error, $checkout);
+                my $err = run_command("hg --repository $repo_loc checkout $branch");
+                if ($err) {
+                	push (@components_error, $checkout);
+                	run_command("mv $repo_loc $repo_loc-branch-failed");
+                	$updated_hg_repos{$hg_repo} = -1;
+                	my $logmsg = "Error: Could not checkout $checkout, unable to switch to branch $branch.";
+                	print "$logmsg\n";
+                	&LOG($logmsg);
+                	return $err;
+                }                
                 #chdir("..");
             }
             if (defined $date) {
                 #chdir("$hg_repo");
-                run_command("hg --repository $repo_loc checkout --date $date") == 0 or push (@components_error, $checkout);
+                my $err = run_command("hg --repository $repo_loc checkout --date $date");
+                if ($err) {
+                	push (@components_error, $checkout);
+                	run_command("mv $repo_loc $repo_loc-date-failed");
+                	$updated_hg_repos{$hg_repo} = -1;
+                	my $logmsg = "Error: Could not checkout $checkout, unable to checkout from date $date.";
+                	print "$logmsg\n";
+                	&LOG($logmsg);
+                	return $err;
+                }
                 #chdir("..");
             }
             $updated_hg_repos{$hg_repo} = 1;
@@ -1786,8 +1845,20 @@ sub handle_hg
                 $semaphores{$hg_repo}->up();
             }
             return $err;
-        }
-        else {
+        } elsif ($checkout eq '.') {
+                # checkout entire repo
+                $cmd = "ln -s $hg_repos_dir/$hg_repo $name";
+                if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
+                return if (-e "$name");
+                my $err = run_command($cmd);
+                if ($err) {push (@components_error, $checkout.": symlink error.")}
+                if ($PARALLEL) {
+                    $semaphores{$hg_repo}->up();
+                }
+                chdir($orig_dir);
+                if ($PARALLEL) {$cd_sem->up()}
+                return $err;
+        } else {
             $cmd = "ln -s $hg_repos_dir/$hg_repo/$checkout $checkout_item";
             if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
             return if (-e "$checkout_item");
@@ -1908,6 +1979,8 @@ sub run_command
     my $VERBOSE_OVERRIDE = shift;
     if ($command =~ /^$/) {return}
     my $out = '';
+    select(STDOUT);
+    $|++;
     # if for some reason $VERBOSE has been set to a value higher than 2, we will
     # assume the user wants full verbosity
 
