@@ -45,8 +45,9 @@ eventually will succeed the current Perl implementation when I have time to
 finish it. generateCRL.py is basically a reverse GetComponents script. It will
 analyze the contents of the working directory and generate a CRL file, 
 allowing you to checkout the same items on another computer without having
-to write the CRL yourself. It is very new and only supports svn right now
-(there are still some bugs with svn too).
+to write the CRL yourself. It is very new and only supports svn and cvs right 
+now (it will not produce the correct checkout path if you used "cvs checkout 
+-d").
 
 Author
 ------
