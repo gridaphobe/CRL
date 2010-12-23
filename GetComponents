@@ -2156,9 +2156,7 @@ GetComponents
 
 =head1 SYNOPSIS
 
-GetComponents [options] [file]
-
-GetComponents [options] [URL]
+GetComponents [options] [file|URL]
 
 Options:
 
@@ -2182,8 +2180,8 @@ Options:
 
     --date          checkout from a specific date
 
-    --reset-
-    authentication  delete authentication files
+    --reset-authentication
+                    delete authentication files
 
 =head1 OPTIONS
 
