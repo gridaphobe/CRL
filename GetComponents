@@ -1159,6 +1159,7 @@ sub handle_git
             chdir("$orig_dir/$target/$checkout_dir");
         }
         else {
+            run_command("mkdir -p $orig_dir/$target");
             chdir("$orig_dir/$target");
             $checkout_item = $checkout;
         }
@@ -1488,6 +1489,7 @@ sub handle_darcs
             chdir("$orig_dir/$target/$checkout_dir");
         }
         else {
+            run_command("mkdir -p $orig_dir/$target");
             chdir("$orig_dir/$target");
             $checkout_item = $checkout;
         }
@@ -1818,6 +1820,7 @@ sub handle_hg
             chdir("$orig_dir/$target/$checkout_dir");
         }
         else {
+            run_command("mkdir -p $orig_dir/$target");
             chdir("$orig_dir/$target");
             $checkout_item = $checkout;
         }
