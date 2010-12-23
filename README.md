@@ -11,8 +11,7 @@ GetComponents.
 
 Usage
 -----
-    ./GetComponents [options] [file]
-    ./GetComponents [options] [url]
+    ./GetComponents [options] [file|URL]
 
 GetComponents will accept a CRL file specified locally or remotely, in which case
 it will download the remote file. It can checkout and update components (also from a
@@ -30,7 +29,7 @@ checking out the [Einstein Toolkit][et]. It's an open source toolkit for solving
 relativistic equations, and is using GetComponents as its primary means of
 distribution.
 
-    ./GetComponents --anonymous http://svn.einsteintoolkit.org/branches/ET_2010_06/einsteintoolkit.th
+    ./GetComponents --anonymous http://svn.einsteintoolkit.org/branches/ET_2010_11/einsteintoolkit.th
 
 Notes
 -----
@@ -56,5 +55,5 @@ Author
 [eseidel]:http://www.eseidel.org
 [GetComponents]:http://www.eseidel.org/projects/GetComponents
 [cctk]:http://www.cactuscode.org
-[wiki]:http://github.com/gridaphobe/GetComponents/wiki
+[wiki]:http://github.com/gridaphobe/CRL/wiki
 [et]:http://www.einsteintoolkit.org
