@@ -1180,7 +1180,7 @@ sub handle_git
             # checkout entire repo
             $cmd = "(cd $target_dir && ln -s $git_repos_dir/$git_repo $name)";
             if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
-            return if (-e "$name");
+            return if (-e "$target_dir/$name");
             my $err = run_command($cmd);
             if ($err) {push (@components_error, $checkout.": symlink error.")}
             if ($PARALLEL) {
@@ -1191,7 +1191,7 @@ sub handle_git
         } else {
             $cmd = "(cd $target_dir && ln -s $git_repos_dir/$git_repo/$checkout $checkout_item)";
             if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
-            return if (-e "$checkout_item");
+            return if (-e "$target_dir/$checkout_item");
             my $err = run_command($cmd);
             if ($err) {push (@components_error, $checkout.": symlink error.")}
             if ($PARALLEL) {
