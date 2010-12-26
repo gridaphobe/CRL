@@ -1000,7 +1000,7 @@ sub handle_svn
     elsif ($method eq 'update') {
 
         my $dir = defined($name) ? $name : $checkout;
-        $cmd = "$svn update $date $orig_dir/$target/$dir";
+        $cmd = "$svn update --non-interactive $date $orig_dir/$target/$dir";
 
         print_update_info($checkout, $url, $target, $name);
         ($err = run_command($cmd)) == 0 or push (@components_error, $checkout);
@@ -1031,7 +1031,7 @@ sub handle_svn
 
         # store username and repo
         save_user($component{USER}, defined($component{"AUTH_URL_ORIG"})?
-                           $component{"AUTH_URL_ORIG"}:$component{"URL_ORIG"});
+                          $component{"AUTH_URL_ORIG"}:$component{"URL_ORIG"});
     }
 
     elsif ($method eq 'verify_url') {
@@ -1965,11 +1965,11 @@ sub run_command
     my $out = '';
     select(STDOUT);
     $|++;
-    # if for some reason $VERBOSE has been set to a value higher than 2, we will
-    # assume the user wants full verbosity
+    # if for some reason $VERBOSE has been set to a value higher than 2, we 
+    # will assume the user wants full verbosity
 
-    # if $VERBOSE == 2 we will print the current directory, the command, and all
-    # output from the command
+    # if $VERBOSE == 2 we will print the current directory, the command, and 
+    # all output from the command
     if ($VERBOSE >= 2) {
         print "cwd = ".cwd()."\n";
         print "$command\n";
