@@ -42,7 +42,6 @@ use Cwd;
 # import optional threading modules
 my $PARALLEL;
 my %semaphores;
-my $cd_sem;
 my $QUEUE;
 eval {
     require threads;
@@ -57,8 +56,6 @@ unless ($@) {
     import Thread::Semaphore;
     #$PARALLEL = 1;
     $QUEUE = Thread::Queue->new();
-    # create universal semaphore for any chdir calls
-	$cd_sem = Thread::Semaphore->new();
 }
 
 my $combined_components = "# This file was automatically generated using the GetComponents script.\n\n";
@@ -1105,25 +1102,25 @@ sub handle_git
             	return $err;
             }
             if (defined $branch) {
-            	if ($PARALLEL) {$cd_sem->down()}
-                my $err = run_command("(cd $repo_loc && git checkout --track -b $branch origin/$branch)");
+                my $err = run_command("cd $repo_loc && " .
+                        "git checkout --track -b $branch origin/$branch");
                 if ($err) {
                 	push (@components_error, $checkout);
                 	run_command("mv $repo_loc $repo_loc-branch-failed");
                 	$updated_git_repos{$git_repo} = -1;
-                	my $logmsg = "Error: Could not checkout $checkout, unable to switch to branch $branch.";
+                	my $logmsg = "Error: Could not checkout $checkout, " .
+                	             "unable to switch to branch $branch.";
                 	print "$logmsg\n";
                 	&LOG($logmsg);
                 	return $err;
                 }
-                if ($PARALLEL) {$cd_sem->up()}
             }
             $updated_git_repos{$git_repo} = 1;
         }
         # if git repo has already been cloned, we will pull the latest version
         elsif ($updated_git_repos{$git_repo} == 0) {
             print_checkout_info($checkout, $url, $target, $name);
-            my $err = run_command("(cd $repo_loc && $git pull)");
+            my $err = run_command("cd $repo_loc && $git pull");
 			if ($err) {
 				push (@components_error, $checkout);
 				return $err;
@@ -1144,7 +1141,6 @@ sub handle_git
             $checkout_item = $checkout;
         }
         
-        if ($PARALLEL) {$cd_sem->down()}
         my $target_dir = "$orig_dir/$target/$checkout_dir";
         run_command("mkdir -p $target_dir");
         
@@ -1161,11 +1157,13 @@ sub handle_git
                 $repo_path =~ s!\$1!$dir1!;
                 $repo_path =~ s!\$2!$dir2!;
 
-                $cmd = "(cd $target_dir && ln -s $git_repos_dir/$git_repo/$repo_path $checkout_item)";
+                $cmd = "cd $target_dir && ".
+                "ln -s $git_repos_dir/$git_repo/$repo_path $checkout_item";
                 if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
             }
             else {
-                $cmd = "(cd $target_dir && ln -s $git_repos_dir/$git_repo/$repo_path/$checkout $checkout_item)";
+                $cmd = "cd $target_dir && ".
+        "ln -s $git_repos_dir/$git_repo/$repo_path/$checkout $checkout_item";
                 if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
             }
             #return if (-e "$checkout_item");
@@ -1174,11 +1172,10 @@ sub handle_git
             if ($PARALLEL) {
                 $semaphores{$git_repo}->up();
             }
-            if ($PARALLEL) {$cd_sem->up()}
             return $err;
         } elsif ($checkout eq '.') {
             # checkout entire repo
-            $cmd = "(cd $target_dir && ln -s $git_repos_dir/$git_repo $name)";
+            $cmd = "cd $target_dir && ln -s $git_repos_dir/$git_repo $name";
             if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
             return if (-e "$target_dir/$name");
             my $err = run_command($cmd);
@@ -1186,10 +1183,10 @@ sub handle_git
             if ($PARALLEL) {
                 $semaphores{$git_repo}->up();
             }
-            if ($PARALLEL) {$cd_sem->up()}
             return $err;
         } else {
-            $cmd = "(cd $target_dir && ln -s $git_repos_dir/$git_repo/$checkout $checkout_item)";
+            $cmd = "cd $target_dir && ".
+                "ln -s $git_repos_dir/$git_repo/$checkout $checkout_item";
             if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
             return if (-e "$target_dir/$checkout_item");
             my $err = run_command($cmd);
@@ -1197,7 +1194,6 @@ sub handle_git
             if ($PARALLEL) {
                 $semaphores{$git_repo}->up();
             }
-            if ($PARALLEL) {$cd_sem->up()}
             return $err;
         }
     }
@@ -1207,21 +1203,21 @@ sub handle_git
         if ($updated_git_repos{$git_repo} == 0) {
             if ($PARALLEL) {
                 $semaphores{$git_repo}->down();
-                $cd_sem->down();
             }
 			
-            if (! -e "$orig_dir/$ROOT/repos/$git_repo" && -e "$orig_dir/$ROOT/git-repos/$git_repo") {
+            if (! -e "$orig_dir/$ROOT/repos/$git_repo" && 
+                  -e "$orig_dir/$ROOT/git-repos/$git_repo") {
                 run_command("mkdir -p $orig_dir/$ROOT/repos");
-                run_command("(cd $orig_dir/$ROOT/repos && ln -s ../git-repos/$git_repo $git_repo)")
+                run_command("cd $orig_dir/$ROOT/repos && " .
+                            "ln -s ../git-repos/$git_repo $git_repo")
             }
             print_update_info($checkout, $url, $target, $name);
-            my $err = run_command("(cd $repo_loc && $git pull)");
+            my $err = run_command("cd $repo_loc && $git pull");
             if ($err) {push (@components_error, $checkout)}
             $updated_git_repos{$git_repo} = 1;
 
             if ($PARALLEL) {
                 $semaphores{$git_repo}->up();
-                $cd_sem->up();
             }
             return $err;
         }
@@ -1439,7 +1435,8 @@ sub handle_darcs
 			}
             $updated_darcs_repos{$darcs_repo} = 1;
         }
-        # if darcs repo has already been cloned, we will pull the latest version
+        # if darcs repo has already been cloned, we will pull the latest 
+        # version
         elsif ($updated_darcs_repos{$darcs_repo} == 0) {
             #chdir("$orig_dir/$ROOT/repos/$darcs_repo");
             print_checkout_info($checkout, $url, $target, $name);
@@ -1461,19 +1458,17 @@ sub handle_darcs
             # out will be placed in $checkout_dir instead of $checkout_item,
             # breaking the relative path for the symlink
             $checkout_dir = '';
-        }
-        # get relative path from target directory to directory containing the repositories
-        $darcs_repos_dir = File::Spec->abs2rel("$orig_dir/$ROOT/repos", "$orig_dir/$target/$checkout_dir");
-        # have to chdir to checkout dir for link to work properly
-        if ($checkout =~ /\//) {
-            run_command("mkdir -p $orig_dir/$target/$checkout_dir");
-            chdir("$orig_dir/$target/$checkout_dir");
-        }
-        else {
-            run_command("mkdir -p $orig_dir/$target");
-            chdir("$orig_dir/$target");
             $checkout_item = $checkout;
         }
+        
+        my $target_dir = "$orig_dir/$target/$checkout_dir";
+        run_command("mkdir -p $target_dir");
+        
+        
+        # get relative path from target directory to directory containing the 
+        # repositories
+        $darcs_repos_dir = File::Spec->abs2rel("$orig_dir/$ROOT/repos", 
+                                        "$orig_dir/$target/$checkout_dir");
 
         # now we create a symlink from the repo to the appropriate target
         if (defined($repo_path)) {
@@ -1483,11 +1478,13 @@ sub handle_darcs
                 $repo_path =~ s!\$1!$dir1!;
                 $repo_path =~ s!\$2!$dir2!;
 
-                $cmd = "ln -s $darcs_repos_dir/$darcs_repo/$repo_path $checkout_item";
+                $cmd = "cd $target_dir && ".
+            "ln -s $darcs_repos_dir/$darcs_repo/$repo_path $checkout_item";
                 if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
             }
             else {
-                $cmd = "ln -s $darcs_repos_dir/$darcs_repo/$repo_path/$checkout $checkout_item";
+                $cmd = "cd $target_dir && ".
+    "ln -s $darcs_repos_dir/$darcs_repo/$repo_path/$checkout $checkout_item";
                 if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
             }
             #return if (-e "$checkout_item");
@@ -1500,21 +1497,22 @@ sub handle_darcs
             return $err;
         } elsif ($checkout eq '.') {
             # checkout entire repo
-            $cmd = "ln -s $darcs_repos_dir/$darcs_repo $name";
+            $cmd = "cd $target_dir && " .
+                    "ln -s $darcs_repos_dir/$darcs_repo $name";
             if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
-            return if (-e "$name");
+            return if (-e "$target_dir/$name");
             my $err = run_command($cmd);
             if ($err) {push (@components_error, $checkout.": symlink error.")}
             if ($PARALLEL) {
                 $semaphores{$darcs_repo}->up();
             }
-            chdir($orig_dir);
-            if ($PARALLEL) {$cd_sem->up()}
+            #chdir($orig_dir);
             return $err;
         } else {
-            $cmd = "ln -s $darcs_repos_dir/$darcs_repo/$checkout $checkout_item";
+            $cmd = "cd $target_dir && " .
+            "ln -s $darcs_repos_dir/$darcs_repo/$checkout $checkout_item";
             if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
-            return if (-e "$checkout_item");
+            return if (-e "$target_dir/$checkout_item");
             my $err = run_command($cmd);
             if ($err) {push (@components_error, $checkout.": symlink error.")}
 
@@ -1530,12 +1528,13 @@ sub handle_darcs
             if ($PARALLEL) {
                 $semaphores{$darcs_repo}->down();
             }
-            if (! -e "$orig_dir/$ROOT/repos/$darcs_repo" && -e "$orig_dir/$ROOT/darcs-repos/$darcs_repo") {
+            if (! -e "$orig_dir/$ROOT/repos/$darcs_repo" && 
+                  -e "$orig_dir/$ROOT/darcs-repos/$darcs_repo") {
                 run_command("mkdir -p $orig_dir/$ROOT/repos");
-                chdir("$orig_dir/$ROOT/repos");
-                run_command("ln -s ../darcs-repos/$darcs_repo $darcs_repo")
+                run_command("cd $orig_dir/$ROOT/repos && ".
+                             "ln -s ../darcs-repos/$darcs_repo $darcs_repo")
             }
-            chdir($orig_dir);
+            #chdir($orig_dir);
             print_update_info($checkout, $url, $target, $name);
             my $err = run_command("$darcs pull --repodir=$repo_loc");
             if ($err) {push (@components_error, $checkout);}
@@ -1595,7 +1594,8 @@ sub handle_darcs
 
     elsif ($method eq 'authenticate') {
         # do something, nothing for now...
-        # darcs authenticates through ssh, so no storing usernames and stuff yet
+        # darcs authenticates through ssh, so no storing usernames and stuff 
+        # yet
         my $user = $component{USER};
         save_user($user, $url);
     }
@@ -1764,7 +1764,8 @@ sub handle_hg
             $updated_hg_repos{$hg_repo} = 1;
             #chdir($orig_dir);
         }
-        # if mercurial repo has already been cloned, we will pull the latest version
+        # if mercurial repo has already been cloned, we will pull the latest 
+        # version
         elsif ($updated_hg_repos{$hg_repo} == 0) {
             #chdir("$orig_dir/$ROOT/repos/$hg_repo");
             print_checkout_info($checkout, $url, $target, $name);
@@ -1782,8 +1783,8 @@ sub handle_hg
             $updated_hg_repos{$hg_repo} = 1;
             #chdir($orig_dir);
         }
-        # if mercurial repo has already been updated, we will print checkout info
-        # anyway to suggest that we didn't miss a module
+        # if mercurial repo has already been updated, we will print checkout 
+        # info anyway to suggest that we didn't miss a module
         else {print_checkout_info($checkout, $url, $target, $name)}
 
         my($checkout_dir, $checkout_item) = split(/\//, $checkout);
@@ -1792,19 +1793,16 @@ sub handle_hg
             # out will be placed in $checkout_dir instead of $checkout_item,
             # breaking the relative path for the symlink
             $checkout_dir = '';
-        }
-        # get relative path from target directory to directory containing the repositories
-        $hg_repos_dir = File::Spec->abs2rel("$orig_dir/$ROOT/repos", "$orig_dir/$target/$checkout_dir");
-        # have to chdir to checkout dir for link to work properly
-        if ($checkout =~ /\//) {
-            run_command("mkdir -p $orig_dir/$target/$checkout_dir");
-            chdir("$orig_dir/$target/$checkout_dir");
-        }
-        else {
-            run_command("mkdir -p $orig_dir/$target");
-            chdir("$orig_dir/$target");
             $checkout_item = $checkout;
         }
+        
+        my $target_dir = "$orig_dir/$target/$checkout_dir";
+        run_command("mkdir -p $target_dir");
+        
+        # get relative path from target directory to directory containing the 
+        # repositories
+        $hg_repos_dir = File::Spec->abs2rel("$orig_dir/$ROOT/repos", 
+                                        "$orig_dir/$target/$checkout_dir");
 
         # now we create a symlink from the repo to the appropriate target
         if (defined($repo_path)) {
@@ -1814,11 +1812,13 @@ sub handle_hg
                 $repo_path =~ s!\$1!$dir1!;
                 $repo_path =~ s!\$2!$dir2!;
 
-                $cmd = "ln -s $hg_repos_dir/$hg_repo/$repo_path $checkout_item";
+                $cmd = "cd $target_dir && " .
+                    "ln -s $hg_repos_dir/$hg_repo/$repo_path $checkout_item";
                 if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
             }
             else {
-                $cmd = "ln -s $hg_repos_dir/$hg_repo/$repo_path/$checkout $checkout_item";
+                $cmd = "cd $target_dir && ".
+        "ln -s $hg_repos_dir/$hg_repo/$repo_path/$checkout $checkout_item";
                 if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
             }
             #return if (-e "$checkout_item");
@@ -1831,21 +1831,22 @@ sub handle_hg
             return $err;
         } elsif ($checkout eq '.') {
                 # checkout entire repo
-                $cmd = "ln -s $hg_repos_dir/$hg_repo $name";
+                $cmd = "cd $target_dir && ".
+                        "ln -s $hg_repos_dir/$hg_repo $name";
                 if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
-                return if (-e "$name");
+                return if (-e "$target_dir/$name");
                 my $err = run_command($cmd);
                 if ($err) {push (@components_error, $checkout.": symlink error.")}
                 if ($PARALLEL) {
                     $semaphores{$hg_repo}->up();
                 }
-                chdir($orig_dir);
-                if ($PARALLEL) {$cd_sem->up()}
+                #chdir($orig_dir);
                 return $err;
         } else {
-            $cmd = "ln -s $hg_repos_dir/$hg_repo/$checkout $checkout_item";
+            $cmd = "cd $target_dir && ".
+                    "ln -s $hg_repos_dir/$hg_repo/$checkout $checkout_item";
             if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
-            return if (-e "$checkout_item");
+            return if (-e "$target_dir/$checkout_item");
             my $err = run_command($cmd);
             if ($err) {push (@components_error, $checkout.": symlink error.")}
 
@@ -1861,12 +1862,13 @@ sub handle_hg
             if ($PARALLEL) {
                 $semaphores{$hg_repo}->down();
             }
-            if (! -e "$orig_dir/$ROOT/repos/$hg_repo" && -e "$orig_dir/$ROOT/hg-repos/$hg_repo") {
+            if (! -e "$orig_dir/$ROOT/repos/$hg_repo" && 
+                  -e "$orig_dir/$ROOT/hg-repos/$hg_repo") {
                 run_command("mkdir -p $orig_dir/$ROOT/repos");
-                chdir("$orig_dir/$ROOT/repos");
-                run_command("ln -s ../hg-repos/$hg_repo $hg_repo")
+                run_command("cd $orig_dir/$ROOT/repos && ".
+                            "ln -s ../hg-repos/$hg_repo $hg_repo")
             }
-            chdir($orig_dir);
+            #chdir($orig_dir);
             print_update_info($checkout, $url, $target, $name);
             my $err = run_command("$hg --repository $repo_loc pull --update");
             if ($err) {push (@components_error, $checkout);}
