@@ -75,6 +75,7 @@ my $ANONYMOUS_CHECKOUT = 0;
 my $DO_UPDATES = 0;
 my $STATUS = 0;
 my $DIFF = 0;
+my $SHALLOW_CLONE = -1;
 my $DATE;
 my @CRL_LISTS;
 my @ORIG_LISTS;
@@ -136,6 +137,7 @@ GetOptions('verbose+'       => \$VERBOSE,
            'status'         => \$STATUS,
            'diff'           => \$DIFF,
            'parallel'       => \$PARALLEL,
+           'shallow!'       => \$SHALLOW_CLONE,
            'reset-authentication'   => sub { system("rm $crl_dir/users") })
            or pod2usage(2);
 pod2usage(1) if $HELP;
@@ -1070,6 +1072,8 @@ sub handle_git
         $url = $component{"AUTH_URL"};
         $shallow = '';
     }
+    if    ($SHALLOW_CLONE == 1) { $shallow = ' --depth 1'}
+    elsif ($SHALLOW_CLONE == 0) { $shallow = ''}
     my $checkout = $component{"CHECKOUT"};
     my $repo_path = $component{"REPO_PATH"};
     my $git_repo = $component{"GIT_REPO"};
@@ -2163,6 +2167,8 @@ Options:
 
     --date          checkout from a specific date
 
+    --[no]shallow   force shallow clones for git repositories
+    
     --reset-authentication
                     delete authentication files
 
@@ -2211,6 +2217,9 @@ This allows checking out into an arbitrary directory.
 
 Checkout components from a specific date. Currently only supported for cvs, svn, and mercurial.
 
+=item B<--[no]shallow>
+
+Force GetComponents to add '--depth 1' to all 'git clone' commands. This will reduce the size of all git repositories by ignoring the repository history. The default is to add this tag for anonymous checkouts only.
 
 =item B<--reset-authentication>
 
