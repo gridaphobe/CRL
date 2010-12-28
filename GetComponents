@@ -1125,13 +1125,38 @@ sub handle_git
         # if git repo has already been cloned, we will pull the latest version
         elsif ($updated_git_repos{$git_repo} == 0) {
             print_checkout_info($checkout, $url, $target, $name);
-            my $err = run_command("cd $repo_loc && $git pull");
-			if ($err) {
-				push (@components_error, $checkout);
-				return $err;
-			}
-
-            $updated_git_repos{$git_repo} = 1;
+            my $err = run_command("cd $repo_loc && $git stash");
+            if ($err) {
+                push (@components_error, $checkout);
+                my $logmsg = "Error: Could not update $git_repo. Could not stash local changes.";
+                print "$logmsg\n";
+                &LOG($logmsg);
+                $updated_git_repos{$git_repo} = -1;
+            }
+            $err = run_command("cd $repo_loc && $git pull --rebase");
+            if ($err) {
+                push (@components_error, $checkout);
+                my $logmsg = "Error: Could not update $git_repo. Could not pull in remote changes.";
+                print "$logmsg\n";
+                &LOG($logmsg);
+                $updated_git_repos{$git_repo} = -1;
+            }
+            # have to run `git stash apply` manually to parse output.
+            open (my $output, "cd $repo_loc && $git stash apply 2>&1 |");
+            my $out = <$output>;
+            close $output;
+            $err = $?;
+            if ($err && !$out =~ /No stash found/) {
+                push (@components_error, $checkout);
+                my $logmsg = "Error: Could not update $git_repo. Could not apply stashed changes.";
+                print "$logmsg\n";
+                &LOG($logmsg);
+                $updated_git_repos{$git_repo} = -1;
+            }
+            $err = 0 if $out =~ /No stash found/;
+            
+            $updated_git_repos{$git_repo} = 1 unless 
+                $updated_git_repos{$git_repo} == -1;
         }
         # if git repo has already been updated, we will print checkout info
         # anyway to suggest that we didn't miss a module
@@ -1205,7 +1230,10 @@ sub handle_git
 
     elsif ($method eq 'update') {
 
-        if ($updated_git_repos{$git_repo} == 0) {
+        if ($updated_git_repos{$git_repo} == -1) {
+            return -1;
+        }
+        elsif ($updated_git_repos{$git_repo} == 0) {
             if ($PARALLEL) {
                 $semaphores{$git_repo}->down();
             }
@@ -1217,10 +1245,40 @@ sub handle_git
                             "$ln ../git-repos/$git_repo $git_repo")
             }
             print_update_info($checkout, $url, $target, $name);
-            my $err = run_command("cd $repo_loc && $git pull");
-            if ($err) {push (@components_error, $checkout)}
-            $updated_git_repos{$git_repo} = 1;
-
+            
+            my $err = run_command("cd $repo_loc && $git stash");
+            if ($err) {
+                push (@components_error, $checkout);
+                my $logmsg = "Error: Could not update $git_repo. Could not stash local changes.";
+                print "$logmsg\n";
+                &LOG($logmsg);
+                $updated_git_repos{$git_repo} = -1;
+            }
+            $err = run_command("cd $repo_loc && $git pull --rebase");
+            if ($err) {
+                push (@components_error, $checkout);
+                my $logmsg = "Error: Could not update $git_repo. Could not pull in remote changes.";
+                print "$logmsg\n";
+                &LOG($logmsg);
+                $updated_git_repos{$git_repo} = -1;
+            }
+            # have to run `git stash apply` manually to parse output.
+            open (my $output, "cd $repo_loc && $git stash apply 2>&1 |");
+            my $out = <$output>;
+            close $output;
+            $err = $?;
+            if ($err && !$out =~ /No stash found/) {
+                push (@components_error, $checkout);
+                my $logmsg = "Error: Could not update $git_repo. Could not apply stashed changes.";
+                print "$logmsg\n";
+                &LOG($logmsg);
+                $updated_git_repos{$git_repo} = -1;
+            }
+            $err = 0 if $out =~ /No stash found/;
+            
+            $updated_git_repos{$git_repo} = 1 unless
+                $updated_git_repos{$git_repo} == -1;
+            
             if ($PARALLEL) {
                 $semaphores{$git_repo}->up();
             }
