@@ -87,6 +87,7 @@ my $darcs = 'darcs';
 my $wget = 'wget';
 my $hg = 'hg';
 my $curl = 'curl';
+my $ln = "ln -nsf";
 my $cvs_found = 0;
 my $svn_found = 0;
 my $git_found = 0;
@@ -1162,12 +1163,12 @@ sub handle_git
                 $repo_path =~ s!\$2!$dir2!;
 
                 $cmd = "cd $target_dir && ".
-                "ln -s $git_repos_dir/$git_repo/$repo_path $checkout_item";
+                "$ln $git_repos_dir/$git_repo/$repo_path $checkout_item";
                 if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
             }
             else {
                 $cmd = "cd $target_dir && ".
-        "ln -s $git_repos_dir/$git_repo/$repo_path/$checkout $checkout_item";
+        "$ln $git_repos_dir/$git_repo/$repo_path/$checkout $checkout_item";
                 if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
             }
             #return if (-e "$checkout_item");
@@ -1179,7 +1180,7 @@ sub handle_git
             return $err;
         } elsif ($checkout eq '.') {
             # checkout entire repo
-            $cmd = "cd $target_dir && ln -s $git_repos_dir/$git_repo $name";
+            $cmd = "cd $target_dir && $ln $git_repos_dir/$git_repo $name";
             if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
             return if (-e "$target_dir/$name");
             my $err = run_command($cmd);
@@ -1190,7 +1191,7 @@ sub handle_git
             return $err;
         } else {
             $cmd = "cd $target_dir && ".
-                "ln -s $git_repos_dir/$git_repo/$checkout $checkout_item";
+                "$ln $git_repos_dir/$git_repo/$checkout $checkout_item";
             if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
             return if (-e "$target_dir/$checkout_item");
             my $err = run_command($cmd);
@@ -1213,7 +1214,7 @@ sub handle_git
                   -e "$orig_dir/$ROOT/git-repos/$git_repo") {
                 run_command("mkdir -p $orig_dir/$ROOT/repos");
                 run_command("cd $orig_dir/$ROOT/repos && " .
-                            "ln -s ../git-repos/$git_repo $git_repo")
+                            "$ln ../git-repos/$git_repo $git_repo")
             }
             print_update_info($checkout, $url, $target, $name);
             my $err = run_command("cd $repo_loc && $git pull");
@@ -1483,12 +1484,12 @@ sub handle_darcs
                 $repo_path =~ s!\$2!$dir2!;
 
                 $cmd = "cd $target_dir && ".
-            "ln -s $darcs_repos_dir/$darcs_repo/$repo_path $checkout_item";
+            "$ln $darcs_repos_dir/$darcs_repo/$repo_path $checkout_item";
                 if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
             }
             else {
                 $cmd = "cd $target_dir && ".
-    "ln -s $darcs_repos_dir/$darcs_repo/$repo_path/$checkout $checkout_item";
+    "$ln $darcs_repos_dir/$darcs_repo/$repo_path/$checkout $checkout_item";
                 if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
             }
             #return if (-e "$checkout_item");
@@ -1502,7 +1503,7 @@ sub handle_darcs
         } elsif ($checkout eq '.') {
             # checkout entire repo
             $cmd = "cd $target_dir && " .
-                    "ln -s $darcs_repos_dir/$darcs_repo $name";
+                    "$ln $darcs_repos_dir/$darcs_repo $name";
             if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
             return if (-e "$target_dir/$name");
             my $err = run_command($cmd);
@@ -1514,7 +1515,7 @@ sub handle_darcs
             return $err;
         } else {
             $cmd = "cd $target_dir && " .
-            "ln -s $darcs_repos_dir/$darcs_repo/$checkout $checkout_item";
+            "$ln $darcs_repos_dir/$darcs_repo/$checkout $checkout_item";
             if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
             return if (-e "$target_dir/$checkout_item");
             my $err = run_command($cmd);
@@ -1536,7 +1537,7 @@ sub handle_darcs
                   -e "$orig_dir/$ROOT/darcs-repos/$darcs_repo") {
                 run_command("mkdir -p $orig_dir/$ROOT/repos");
                 run_command("cd $orig_dir/$ROOT/repos && ".
-                             "ln -s ../darcs-repos/$darcs_repo $darcs_repo")
+                             "$ln ../darcs-repos/$darcs_repo $darcs_repo")
             }
             #chdir($orig_dir);
             print_update_info($checkout, $url, $target, $name);
@@ -1817,12 +1818,12 @@ sub handle_hg
                 $repo_path =~ s!\$2!$dir2!;
 
                 $cmd = "cd $target_dir && " .
-                    "ln -s $hg_repos_dir/$hg_repo/$repo_path $checkout_item";
+                    "$ln $hg_repos_dir/$hg_repo/$repo_path $checkout_item";
                 if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
             }
             else {
                 $cmd = "cd $target_dir && ".
-        "ln -s $hg_repos_dir/$hg_repo/$repo_path/$checkout $checkout_item";
+        "$ln $hg_repos_dir/$hg_repo/$repo_path/$checkout $checkout_item";
                 if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
             }
             #return if (-e "$checkout_item");
@@ -1836,7 +1837,7 @@ sub handle_hg
         } elsif ($checkout eq '.') {
                 # checkout entire repo
                 $cmd = "cd $target_dir && ".
-                        "ln -s $hg_repos_dir/$hg_repo $name";
+                        "$ln $hg_repos_dir/$hg_repo $name";
                 if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
                 return if (-e "$target_dir/$name");
                 my $err = run_command($cmd);
@@ -1848,7 +1849,7 @@ sub handle_hg
                 return $err;
         } else {
             $cmd = "cd $target_dir && ".
-                    "ln -s $hg_repos_dir/$hg_repo/$checkout $checkout_item";
+                    "$ln $hg_repos_dir/$hg_repo/$checkout $checkout_item";
             if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
             return if (-e "$target_dir/$checkout_item");
             my $err = run_command($cmd);
@@ -1870,7 +1871,7 @@ sub handle_hg
                   -e "$orig_dir/$ROOT/hg-repos/$hg_repo") {
                 run_command("mkdir -p $orig_dir/$ROOT/repos");
                 run_command("cd $orig_dir/$ROOT/repos && ".
-                            "ln -s ../hg-repos/$hg_repo $hg_repo")
+                            "$ln ../hg-repos/$hg_repo $hg_repo")
             }
             #chdir($orig_dir);
             print_update_info($checkout, $url, $target, $name);
