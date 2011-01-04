@@ -1141,14 +1141,14 @@ sub handle_git
                 &LOG($logmsg);
                 $updated_git_repos{$git_repo} = -1;
             }
-            # have to run `git stash apply` manually to parse output.
-            open (my $output, "cd $repo_loc && $git stash apply 2>&1 |");
+            # have to run `git stash pop` manually to parse output.
+            open (my $output, "cd $repo_loc && $git stash pop 2>&1 |");
             my $out = <$output>;
             close $output;
             $err = $?;
             if ($err && !$out =~ /No stash found/) {
                 push (@components_error, $checkout);
-                my $logmsg = "Error: Could not update $git_repo. Could not apply stashed changes.";
+                my $logmsg = "Error: Could not update $git_repo. Could not pop stashed changes.";
                 print "$logmsg\n";
                 &LOG($logmsg);
                 $updated_git_repos{$git_repo} = -1;
@@ -1262,14 +1262,14 @@ sub handle_git
                 &LOG($logmsg);
                 $updated_git_repos{$git_repo} = -1;
             }
-            # have to run `git stash apply` manually to parse output.
-            open (my $output, "cd $repo_loc && $git stash apply 2>&1 |");
+            # have to run `git stash pop` manually to parse output.
+            open (my $output, "cd $repo_loc && $git stash pop 2>&1 |");
             my $out = <$output>;
             close $output;
             $err = $?;
             if ($err && !$out =~ /No stash found/) {
                 push (@components_error, $checkout);
-                my $logmsg = "Error: Could not update $git_repo. Could not apply stashed changes.";
+                my $logmsg = "Error: Could not update $git_repo. Could not pop stashed changes.";
                 print "$logmsg\n";
                 &LOG($logmsg);
                 $updated_git_repos{$git_repo} = -1;
