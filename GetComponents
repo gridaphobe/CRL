@@ -3,7 +3,6 @@
 =begin comment
 
 File:           GetComponents
-Version:        1.0
 Author:         Eric Seidel
 Email:          eric@eseidel.org
 Description:    This program automates the procedure of checking out components
@@ -1383,23 +1382,23 @@ sub handle_curl
     if ($method eq 'checkout') {
 
         run_command("mkdir -p $target");
-        chdir($target);
+        #chdir($target);
         if (defined($name)) {
             die if $checkout =~ m{/};
             # wget cannot check out into a specific directory.  we
             # therefore check out in a new "tmp" subdirectory, and
             # then rename, and then delete "tmp" again.
-            my $tmpdir = ".GetComponents-tmp-$$";
+            my $tmpdir = "$target/.GetComponents-tmp-$$";
             $cmd =
                 "{ " .
                 "rm -rf $tmpdir && " .
                 "mkdir $tmpdir && " .
                 "(cd $tmpdir && $curl -O $user $url/$checkout) && " .
-                "mv $tmpdir/$checkout $name &&" .
+                "mv $tmpdir/$checkout $target/$name &&" .
                 "rmdir $tmpdir; " .
                 "}";
         } else {
-            $cmd = "$curl -O $user $url/$checkout";
+            $cmd = "cd $target && $curl -O $user $url/$checkout";
         }
         print_checkout_info($checkout, $url, $target, $name);
         run_command($cmd) == 0 or push (@components_error, $checkout);
@@ -1413,18 +1412,18 @@ sub handle_curl
             # wget cannot check out into a specific directory.  we
             # therefore check out in a new "tmp" subdirectory, and
             # then rename, and then delete "tmp" again.
-            my $tmpdir = ".GetComponents-tmp-$$";
+            my $tmpdir = "$target/.GetComponents-tmp-$$";
             $cmd =
                 "{ " .
                 "rm -rf $tmpdir && " .
                 "mkdir $tmpdir && " .
                 "mv $name $tmpdir/$checkout && ".
                 "(cd $tmpdir && $curl -O $user $url/$checkout) && " .
-                "mv $tmpdir/$checkout $name &&" .
+                "mv $tmpdir/$checkout $target/$name &&" .
                 "rmdir $tmpdir; " .
                 "}";
         } else {
-            $cmd = "$curl -O $user $url/$checkout";
+            $cmd = "cd $target && $curl -O $user $url/$checkout";
         }
 
         # add modification timestamp to old version
@@ -1432,12 +1431,12 @@ sub handle_curl
         $year += 1900;
         $mon++;
         my $temp = "$mon.$mday.$year.$checkout";
-        run_command("mv $checkout $temp");
+        run_command("mv $target/$checkout $traget/$temp");
         print_update_info($checkout, $url, $target, $name);
         run_command($cmd) == 0 or push (@components_error, $checkout);
         # compare new version, if equivalent delete old
-        if (run_command("diff $checkout $temp") == 0) {
-            run_command("rm -r $temp");
+        if (run_command("diff $target/$checkout $target/$temp") == 0) {
+            run_command("rm -r $target/$temp");
         }
     }
 
@@ -1684,23 +1683,23 @@ sub handle_wget
     if ($method eq 'checkout') {
 
         run_command("mkdir -p $target");
-        chdir($target);
+        #chdir($target);
         if (defined($name)) {
             die if $checkout =~ m{/};
             # wget cannot check out into a specific directory.  we
             # therefore check out in a new "tmp" subdirectory, and
             # then rename, and then delete "tmp" again.
-            my $tmpdir = ".GetComponents-tmp-$$";
+            my $tmpdir = "$target/.GetComponents-tmp-$$";
             $cmd =
                 "{ " .
                 "rm -rf $tmpdir && " .
                 "mkdir $tmpdir && " .
                 "(cd $tmpdir && $wget $user $pass $url/$checkout) && " .
-                "mv $tmpdir/$checkout $name &&" .
+                "mv $tmpdir/$checkout $target/$name &&" .
                 "rmdir $tmpdir; " .
                 "}";
         } else {
-            $cmd = "$wget $user $pass $url/$checkout";
+            $cmd = "cd $target && $wget $user $pass $url/$checkout";
         }
         print_checkout_info($checkout, $url, $target, $name);
         run_command($cmd) == 0 or push (@components_error, $checkout);
@@ -1708,24 +1707,24 @@ sub handle_wget
 
     elsif ($method eq 'update') {
 
-        chdir("$target");
+        #chdir("$target");
         if (defined($name)) {
             die if $checkout =~ m{/};
             # wget cannot check out into a specific directory.  we
             # therefore check out in a new "tmp" subdirectory, and
             # then rename, and then delete "tmp" again.
-            my $tmpdir = ".GetComponents-tmp-$$";
+            my $tmpdir = "$target/.GetComponents-tmp-$$";
             $cmd =
                 "{ " .
                 "rm -rf $tmpdir && " .
                 "mkdir $tmpdir && " .
                 "mv $name $tmpdir/$checkout && ".
                 "(cd $tmpdir && $wget $user $pass $url/$checkout) && " .
-                "mv $tmpdir/$checkout $name &&" .
+                "mv $tmpdir/$checkout $target/$name &&" .
                 "rmdir $tmpdir; " .
                 "}";
         } else {
-            $cmd = "$wget $user $pass $url/$checkout";
+            $cmd = "cd $target && $wget $user $pass $url/$checkout";
         }
 
         # add modification timestamp to old version
@@ -1733,12 +1732,12 @@ sub handle_wget
         $year += 1900;
         $mon++;
         my $temp = "$mon.$mday.$year.$checkout";
-        run_command("mv $checkout $temp");
+        run_command("mv $target/$checkout $target/$temp");
         print_update_info($checkout, $url, $target, $name);
         run_command($cmd) == 0 or push (@components_error, $checkout);
         # compare new version, if equivalent delete old
-        if (run_command("diff $checkout $temp") == 0) {
-            run_command("rm -r $temp");
+        if (run_command("diff $target/$checkout $target/$temp") == 0) {
+            run_command("rm -r $target/$temp");
         }
     }
 
@@ -2024,12 +2023,11 @@ sub handle_hg
 
 sub run_command
 {
+    #TODO:  rework this function to execute command and return output and exit code. calling function will parse output
     my $command = shift;
     my $VERBOSE_OVERRIDE = shift;
     if ($command =~ /^$/) {return}
     my $out = '';
-    select(STDOUT);
-    $|++;
     # if for some reason $VERBOSE has been set to a value higher than 2, we 
     # will assume the user wants full verbosity
 
