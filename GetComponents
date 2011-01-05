@@ -1431,7 +1431,7 @@ sub handle_curl
         $year += 1900;
         $mon++;
         my $temp = "$mon.$mday.$year.$checkout";
-        run_command("mv $target/$checkout $traget/$temp");
+        run_command("mv $target/$checkout $target/$temp");
         print_update_info($checkout, $url, $target, $name);
         run_command($cmd) == 0 or push (@components_error, $checkout);
         # compare new version, if equivalent delete old
