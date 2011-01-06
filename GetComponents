@@ -1427,7 +1427,7 @@ sub handle_curl
         }
 
         # add modification timestamp to old version
-        my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(stat($checkout)->mtime);
+        my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(stat("$target/$checkout")->mtime);
         $year += 1900;
         $mon++;
         my $temp = "$mon.$mday.$year.$checkout";
@@ -1733,7 +1733,7 @@ sub handle_wget
         }
 
         # add modification timestamp to old version
-        my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(stat($checkout)->mtime);
+        my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(stat("$target/$checkout")->mtime);
         $year += 1900;
         $mon++;
         my $temp = "$mon.$mday.$year.$checkout";
