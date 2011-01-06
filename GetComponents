@@ -1464,15 +1464,19 @@ sub handle_darcs
     my $target = $component{"TARGET"};
     my $name = $component{"NAME"};
     my $url = $component{"URL"};
+    my $shallow = ' --lazy';
     if (defined($component{"AUTH_URL"})) {
         $url = $component{"AUTH_URL"};
+        $shallow = '';
     }
+    if    ($SHALLOW_CLONE == 1) { $shallow = ' --lazy'}
+    elsif ($SHALLOW_CLONE == 0) { $shallow = ''}
     my $checkout = $component{"CHECKOUT"};
     my $repo_path = $component{"REPO_PATH"};
     my $darcs_repo = $component{"DARCS_REPO"};
     my $cmd = '';
     my $darcs_repos_dir = '';
-
+    
     my $repo_loc = "$orig_dir/$ROOT/repos/$darcs_repo";
 
     if ($method eq 'checkout') {
@@ -1488,7 +1492,8 @@ sub handle_darcs
         }
         # clone the darcs repo
         elsif (! -e $repo_loc) {
-            $cmd = "$darcs clone $url $orig_dir/$ROOT/repos/$darcs_repo";
+            $cmd = "$darcs clone $shallow $url". 
+                " $orig_dir/$ROOT/repos/$darcs_repo";
             print_checkout_info($checkout, $url, $target, $name);
             my $err = run_command($cmd);
 			if ($err) {
