@@ -35,19 +35,10 @@
 !TARGET     = $ROOT/darcs
 !TYPE       = darcs
 !URL        = http://darcs.net
-!REPO_PATH  = $2
-!CHECKOUT   =
-DarcsTest/Distribution
-DarcsTest/README
-DarcsTest/doc
-DarcsTest/release
-DarcsTest/src
-DarcsTest/tests
+!CHECKOUT   = src
 
 # Test http component
 !TARGET		= $ROOT/http
 !TYPE		= http
 !URL	 	= http://eseidel.org/download
-!CHECKOUT	= 
-crl-tg10.pdf
-crl-poster.pdf
+!CHECKOUT	= crl-tg10.pdf
