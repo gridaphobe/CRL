@@ -1183,6 +1183,7 @@ sub handle_git
                 $updated_git_repos{$git_repo} = -1;
             }
             ($err, $out) = run_command("cd $repo_loc && $git stash pop");
+            # `git stash pop` returns 1 if there is no stash
             if ($err && $out !~ /no stash found/i) {
                 push (@components_error, $checkout);
                 my $logmsg = "Error: Could not update $git_repo. Could not pop stashed changes.";
@@ -1300,6 +1301,7 @@ sub handle_git
                 $updated_git_repos{$git_repo} = -1;
             }
             ($err, $out) = run_command("cd $repo_loc && $git stash pop");
+            # `git stash pop` returns 1 if there is no stash
             if ($err && $out !~ /no stash found/i) {
                 push (@components_error, $checkout);
                 my $logmsg = "Error: Could not update $git_repo. Could not pop stashed changes.";
