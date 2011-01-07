@@ -64,6 +64,7 @@ my @all_components;
 my $checkout_size :shared = 0;
 my $update_size :shared = 0;
 my @components_error :shared;
+my %svn_servers :shared;
 my $ROOT = '';
 my $VERBOSE = 0;
 my $DEBUG = 0;
@@ -125,7 +126,7 @@ if (! -e "$crl_dir") {
 ####################### MAIN PROGRAM #####################################
 
 # parse options and print usage if syntax error
-GetOptions('verbose+'       => \$VERBOSE,
+GetOptions('verbose'        => \$VERBOSE,
            'help|?'         => \$HELP,
            'man'            => \$MAN,
            'debug'          => \$DEBUG,
@@ -223,13 +224,13 @@ sub download_list
 
 sub find_tools
 {
-    if (run_command("which $cvs") == 0) {$cvs_found = 1}
-    if (run_command("which $svn") == 0) {$svn_found = 1}
-    if (run_command("which $git") == 0) {$git_found = 1}
-    if (run_command("which $curl") == 0) {$curl_found = 1; $curl .= " -f"}
-    elsif (run_command("which $wget") == 0) {$wget_found = 1}
-    if (run_command("which $darcs") == 0) {$darcs_found = 1}
-    if (run_command("which $hg") == 0) {$hg_found = 1}
+    if (system("which -s $cvs") == 0) {$cvs_found = 1}
+    if (system("which -s $svn") == 0) {$svn_found = 1}
+    if (system("which -s $git") == 0) {$git_found = 1}
+    if (system("which -s $curl") == 0) {$curl_found = 1; $curl .= " -f"}
+    elsif (system("which -s $wget") == 0) {$wget_found = 1}
+    if (system("which -s $darcs") == 0) {$darcs_found = 1}
+    if (system("which -s $hg") == 0) {$hg_found = 1}
     if ($cvs_found) {
         # Use compression to speed up slow links, and to avoid
         # transmission errors with CCT's CVS server
@@ -430,6 +431,19 @@ sub parse_list
             chomp $hg;
         }
 
+        # check for svn SSL problems
+        if ($rec{"TYPE"} eq "svn" && defined $rec{"AUTH_URL"}) {
+            my $base = $rec{"AUTH_URL"};
+            $base =~ s/(https\:\/\/[\w\.]+)\/(.*)$/$1/i;
+            unless ($base ~~ %svn_servers) {
+                my $ret = `$svn --non-interactive info $rec{AUTH_URL} 2>&1`;
+                if ($ret =~ /Server certificate verification failed/) {
+                    $svn_servers{$base} = 0;
+                } else {
+                    $svn_servers{$base} = 1;
+                }
+            }
+        }
         # parse name of git repo
         if ($rec{"TYPE"} eq "git") {
             my $git_repo = $rec{"URL"};
@@ -762,14 +776,6 @@ sub checkout
 {
     my @components :shared = @_;
     if ($PARALLEL) {
-#         foreach my $component (@components_to_checkout) {
-#             shift @components_to_checkout;
-#             if ($component->{TARGET} == $DEFINITIONS{ROOT}) {
-#                 process_component($component->{TYPE}, 'checkout', %{$component});
-#             } else {
-#                 push @components_to_checkout, $component;
-#             }
-#         }
         no warnings 'threads';
         $QUEUE->enqueue(@components);
         my $thr1 = threads->create(\&worker, 'checkout');
@@ -894,9 +900,12 @@ sub handle_cvs
         }
 
         print_checkout_info($checkout, $url, $target, $name);
-        my $err = run_command($cmd);
-        if ($err != 0) {
-            WARN_nonfatal("  ERROR: Could not check out module $checkout");
+        my ($err, $out) = run_command($cmd);
+        if ($err != 0 || $out =~ /^cvs:/gmi) {
+            my $log = "ERROR: Could not check out module $checkout\n";
+            $out =~ s'^(?!\S*:\s).*$''gmi;
+            $log .= $out;
+            WARN_nonfatal($log);
             push (@components_error, $checkout);
         }
         return $err;
@@ -909,9 +918,12 @@ sub handle_cvs
         $cmd = "$cvs -q update -dP $date $branch";
 
         print_update_info($checkout, $url, $target, $name);
-        my $err = run_command($cmd);
-        if ($err != 0) {
-            WARN_nonfatal("  ERROR: Could not update module $checkout");
+        my ($err, $out) = run_command($cmd);
+        if ($err != 0 || $out =~ /^cvs:/gmi) {
+            my $log = "ERROR: Could not update module $checkout\n";
+            $out =~ s'^(?!\S*:\s).*$''gmi;
+            $log .= $out;
+            WARN_nonfatal($log);
             push (@components_error, $checkout);
         }
         return $err;
@@ -979,13 +991,20 @@ sub handle_svn
     my $cmd = '';
     my $user = defined($component{USER}) ? "--username $component{USER}" : ' ';
     my $err = 0;
+    my $out = '';
     my $date = defined $DATE ? "-r {$DATE}" : ' ';
-
+    
+    my $bad_cert = 0;
     my $url = $component{"URL"};
     if (defined($component{"AUTH_URL"})) {
         $url = $component{"AUTH_URL"};
+        my $base = $url;
+        $base =~ s/(https\:\/\/[\w\.]+)\/(.*)$/$1/i;
+        unless ($svn_servers{$base}) {
+            $bad_cert = 1;
+        }
     }
-
+    
     if ($method eq 'checkout') {
 
         run_command("mkdir -p $target");
@@ -993,7 +1012,17 @@ sub handle_svn
         $cmd = "$svn checkout $user $date $url $orig_dir/$target/$dir";
 
         print_checkout_info($checkout, $url, $target, $name);
-        ($err = run_command($cmd)) == 0 or push (@components_error, $checkout);
+        # let svn print to stderr to facilitate dealing with
+        # server certificate issues
+        ($err, $out) = run_command($cmd, $VERBOSE, $bad_cert);
+        if ($err || $out =~ /^svn/gmi) {
+            my $log = "ERROR: Could not checkout module $checkout\n";
+            $out =~ s/^(?!svn).*$//gmi;
+            $log .= $out;
+            WARN_nonfatal($log);
+            push (@components_error, $checkout);
+        }
+        return $err;
     }
 
     elsif ($method eq 'update') {
@@ -1002,7 +1031,15 @@ sub handle_svn
         $cmd = "$svn update --non-interactive $date $orig_dir/$target/$dir";
 
         print_update_info($checkout, $url, $target, $name);
-        ($err = run_command($cmd)) == 0 or push (@components_error, $checkout);
+        ($err, $out) = run_command($cmd, $VERBOSE, $bad_cert);
+        if ($err || $out =~ /^svn/gmi) {
+            my $log = "ERROR: Could not update module $checkout\n";
+            $out =~ s/^(?!svn).*$//gmi;
+            $log .= $out;
+            WARN_nonfatal($log);
+            push (@components_error, $checkout);
+        }
+        return $err;
     }
 
     elsif ($method eq 'status') {
@@ -1058,7 +1095,7 @@ sub handle_svn
 
     }
     else {DIE("Unrecognized checkout method: $method")}
-    return $err;
+    #return $err;
 }
 
 sub handle_git
@@ -2017,6 +2054,7 @@ sub handle_hg
                 $same_url = 1;
             }
         }
+        close $output;
         chdir("$orig_dir");
         $verified_hg_repos{$hg_repo} = 1;
         return 1 if $same_url;
@@ -2028,14 +2066,21 @@ sub handle_hg
 
 sub run_command
 {
-    #TODO:  rework this function to execute command and return output and exit code. calling function will parse output
+    # TODO: rework this function to execute command and return output and exit code. calling function will parse output
     my $command = shift;
     my $VERBOSE_OVERRIDE = shift;
+    my $show_err = shift;
+    my $verbose = defined $VERBOSE_OVERRIDE ? $VERBOSE_OVERRIDE : $VERBOSE;
+    my $err = defined $show_err ? '' : ' 2>&1';
     if ($command =~ /^$/) {return}
-    my $out = '';
+    # for verbose we will not collect output as everything will go to stdout
+    my $out = `$command$err`;
+    my $ret = $?;
+    print $out if $verbose;
+    return ($ret, $out);
     # if for some reason $VERBOSE has been set to a value higher than 2, we 
     # will assume the user wants full verbosity
-
+=begin comment
     # if $VERBOSE == 2 we will print the current directory, the command, and 
     # all output from the command
     if ($VERBOSE >= 2) {
@@ -2085,6 +2130,8 @@ sub run_command
         LOG("Could not run command: $command\ncwd = ".cwd()."\n$out") if $errno;
         return $errno;
    }
+=end comment
+=cut
 }
 
 sub info
