@@ -1137,22 +1137,27 @@ sub handle_git
         elsif (! -e $repo_loc) {
             $cmd = "$git clone$shallow $url $orig_dir/$ROOT/repos/$git_repo";
             print_checkout_info($checkout, $url, $target, $name);
-            my $err = run_command($cmd);
+            my ($err, $out) = run_command($cmd);
             if ($err) {
+                my $log = "ERROR: Could not checkout module $checkout\n";
+                $out =~ s/^(?!fatal).*$//gmi;
+                $log .= $out;
+                WARN_nonfatal($log);
             	push (@components_error, $checkout);
             	return $err;
             }
             if (defined $branch) {
-                my $err = run_command("cd $repo_loc && " .
-                        "git checkout --track -b $branch origin/$branch");
+                $cmd = "cd $repo_loc && " .
+                        "git checkout --track -b $branch origin/$branch";
+                my ($err, $out) = run_command($cmd);
                 if ($err) {
-                	push (@components_error, $checkout);
                 	run_command("mv $repo_loc $repo_loc-branch-failed");
                 	$updated_git_repos{$git_repo} = -1;
                 	my $logmsg = "Error: Could not checkout $checkout, " .
                 	             "unable to switch to branch $branch.";
                 	print "$logmsg\n";
                 	&LOG($logmsg);
+                	push (@components_error, $checkout);
                 	return $err;
                 }
             }
@@ -1161,7 +1166,7 @@ sub handle_git
         # if git repo has already been cloned, we will pull the latest version
         elsif ($updated_git_repos{$git_repo} == 0) {
             print_checkout_info($checkout, $url, $target, $name);
-            my $err = run_command("cd $repo_loc && $git stash");
+            my ($err, $out) = run_command("cd $repo_loc && $git stash");
             if ($err) {
                 push (@components_error, $checkout);
                 my $logmsg = "Error: Could not update $git_repo. Could not stash local changes.";
@@ -1169,7 +1174,7 @@ sub handle_git
                 &LOG($logmsg);
                 $updated_git_repos{$git_repo} = -1;
             }
-            $err = run_command("cd $repo_loc && $git pull --rebase");
+            ($err, $out) = run_command("cd $repo_loc && $git pull --rebase");
             if ($err) {
                 push (@components_error, $checkout);
                 my $logmsg = "Error: Could not update $git_repo. Could not pull in remote changes.";
@@ -1177,12 +1182,8 @@ sub handle_git
                 &LOG($logmsg);
                 $updated_git_repos{$git_repo} = -1;
             }
-            # have to run `git stash pop` manually to parse output.
-            open (my $output, "cd $repo_loc && $git stash pop 2>&1 |");
-            my $out = <$output>;
-            close $output;
-            $err = $?;
-            if ($err && !$out =~ /No stash found/) {
+            ($err, $out) = run_command("cd $repo_loc && $git stash pop");
+            if ($err && $out !~ /no stash found/i) {
                 push (@components_error, $checkout);
                 my $logmsg = "Error: Could not update $git_repo. Could not pop stashed changes.";
                 print "$logmsg\n";
@@ -1233,7 +1234,7 @@ sub handle_git
                 if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
             }
             #return if (-e "$checkout_item");
-            my $err = run_command($cmd);
+            my ($err, $out) = run_command($cmd);
             if ($err) {push (@components_error, $checkout.": symlink error.")}
             if ($PARALLEL) {
                 $semaphores{$git_repo}->up();
@@ -1244,7 +1245,7 @@ sub handle_git
             $cmd = "cd $target_dir && $ln $git_repos_dir/$git_repo $name";
             if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
             return if (-e "$target_dir/$name");
-            my $err = run_command($cmd);
+            my ($err, $out) = run_command($cmd);
             if ($err) {push (@components_error, $checkout.": symlink error.")}
             if ($PARALLEL) {
                 $semaphores{$git_repo}->up();
@@ -1255,7 +1256,7 @@ sub handle_git
                 "$ln $git_repos_dir/$git_repo/$checkout $checkout_item";
             if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
             return if (-e "$target_dir/$checkout_item");
-            my $err = run_command($cmd);
+            my ($err, $out) = run_command($cmd);
             if ($err) {push (@components_error, $checkout.": symlink error.")}
             if ($PARALLEL) {
                 $semaphores{$git_repo}->up();
@@ -1282,7 +1283,7 @@ sub handle_git
             }
             print_update_info($checkout, $url, $target, $name);
             
-            my $err = run_command("cd $repo_loc && $git stash");
+            my ($err, $out) = run_command("cd $repo_loc && $git stash");
             if ($err) {
                 push (@components_error, $checkout);
                 my $logmsg = "Error: Could not update $git_repo. Could not stash local changes.";
@@ -1290,7 +1291,7 @@ sub handle_git
                 &LOG($logmsg);
                 $updated_git_repos{$git_repo} = -1;
             }
-            $err = run_command("cd $repo_loc && $git pull --rebase");
+            ($err, $out) = run_command("cd $repo_loc && $git pull --rebase");
             if ($err) {
                 push (@components_error, $checkout);
                 my $logmsg = "Error: Could not update $git_repo. Could not pull in remote changes.";
@@ -1298,12 +1299,8 @@ sub handle_git
                 &LOG($logmsg);
                 $updated_git_repos{$git_repo} = -1;
             }
-            # have to run `git stash pop` manually to parse output.
-            open (my $output, "cd $repo_loc && $git stash pop 2>&1 |");
-            my $out = <$output>;
-            close $output;
-            $err = $?;
-            if ($err && !$out =~ /No stash found/) {
+            ($err, $out) = run_command("cd $repo_loc && $git stash pop");
+            if ($err && $out !~ /no stash found/i) {
                 push (@components_error, $checkout);
                 my $logmsg = "Error: Could not update $git_repo. Could not pop stashed changes.";
                 print "$logmsg\n";
@@ -1438,12 +1435,16 @@ sub handle_curl
             $cmd = "cd $target && $curl -O $user $url/$checkout";
         }
         print_checkout_info($checkout, $url, $target, $name);
-        run_command($cmd) == 0 or push (@components_error, $checkout);
+        my ($err, $out) = run_command($cmd);
+        if ($err) {
+            push (@components_error, $checkout);
+        }
+        return $err;
     }
 
     elsif ($method eq 'update') {
 
-        chdir("$target");
+        #chdir("$target");
         if (defined($name)) {
             die if $checkout =~ m{/};
             # wget cannot check out into a specific directory.  we
@@ -1470,11 +1471,11 @@ sub handle_curl
         my $temp = "$mon.$mday.$year.$checkout";
         run_command("mv $target/$checkout $target/$temp");
         print_update_info($checkout, $url, $target, $name);
-        run_command($cmd) == 0 or push (@components_error, $checkout);
+        my ($err, $out) = run_command($cmd);
+        push(@components_error, $checkout) if $err;
         # compare new version, if equivalent delete old
-        if (run_command("diff $target/$checkout $target/$temp") == 0) {
-            run_command("rm -r $target/$temp");
-        }
+        ($err, $out) = run_command("diff $target/$checkout $target/$temp");
+        run_command("rm -r $target/$temp") unless $err;
     }
 
     elsif ($method eq 'status') {
@@ -1532,7 +1533,7 @@ sub handle_darcs
             $cmd = "$darcs clone $shallow $url". 
                 " $orig_dir/$ROOT/repos/$darcs_repo";
             print_checkout_info($checkout, $url, $target, $name);
-            my $err = run_command($cmd);
+            my ($err, $out) = run_command($cmd);
 			if ($err) {
 				push (@components_error, $checkout);
 				return $err;
@@ -1544,7 +1545,7 @@ sub handle_darcs
         elsif ($updated_darcs_repos{$darcs_repo} == 0) {
             #chdir("$orig_dir/$ROOT/repos/$darcs_repo");
             print_checkout_info($checkout, $url, $target, $name);
-            my $err = run_command("$darcs pull --repodir=$repo_loc");
+            my ($err, $out) = run_command("$darcs pull --repodir=$repo_loc");
 			if ($err) {
 				push (@components_error, $checkout);
 				return $err;
@@ -1592,7 +1593,7 @@ sub handle_darcs
                 if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
             }
             #return if (-e "$checkout_item");
-            my $err = run_command($cmd);
+            my ($err, $out) = run_command($cmd);
             if ($err) {push (@components_error, $checkout.": symlink error.")}
 
             if ($PARALLEL) {
@@ -1605,7 +1606,7 @@ sub handle_darcs
                     "$ln $darcs_repos_dir/$darcs_repo $name";
             if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
             return if (-e "$target_dir/$name");
-            my $err = run_command($cmd);
+            my ($err, $out) = run_command($cmd);
             if ($err) {push (@components_error, $checkout.": symlink error.")}
             if ($PARALLEL) {
                 $semaphores{$darcs_repo}->up();
@@ -1617,7 +1618,7 @@ sub handle_darcs
             "$ln $darcs_repos_dir/$darcs_repo/$checkout $checkout_item";
             if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
             return if (-e "$target_dir/$checkout_item");
-            my $err = run_command($cmd);
+            my ($err, $out) = run_command($cmd);
             if ($err) {push (@components_error, $checkout.": symlink error.")}
 
             if ($PARALLEL) {
@@ -1640,7 +1641,7 @@ sub handle_darcs
             }
             #chdir($orig_dir);
             print_update_info($checkout, $url, $target, $name);
-            my $err = run_command("$darcs pull --repodir=$repo_loc");
+            my ($err, $out) = run_command("$darcs pull --repodir=$repo_loc");
             if ($err) {push (@components_error, $checkout);}
             $updated_darcs_repos{$darcs_repo} = 1;
             #chdir($orig_dir);
@@ -1744,7 +1745,8 @@ sub handle_wget
             $cmd = "cd $target && $wget $user $pass $url/$checkout";
         }
         print_checkout_info($checkout, $url, $target, $name);
-        run_command($cmd) == 0 or push (@components_error, $checkout);
+        my ($err, $out) = run_command($cmd);
+        push (@components_error, $checkout) if $err;
     }
 
     elsif ($method eq 'update') {
@@ -1776,11 +1778,11 @@ sub handle_wget
         my $temp = "$mon.$mday.$year.$checkout";
         run_command("mv $target/$checkout $target/$temp");
         print_update_info($checkout, $url, $target, $name);
-        run_command($cmd) == 0 or push (@components_error, $checkout);
+        my ($err, $out) = run_command($cmd); 
+        push (@components_error, $checkout) if $err;
         # compare new version, if equivalent delete old
-        if (run_command("diff $target/$checkout $target/$temp") == 0) {
-            run_command("rm -r $target/$temp");
-        }
+        ($err, $out) = run_command("diff $target/$checkout $target/$temp");
+        run_command("rm -r $target/$temp") unless $err;
     }
 
     elsif ($method eq 'status') {
@@ -1832,14 +1834,14 @@ sub handle_hg
             #chdir("$orig_dir/$ROOT/repos");
             $cmd = "$hg clone $url $repo_loc";
             print_checkout_info($checkout, $url, $target, $name);
-            my $err = run_command($cmd);
+            my ($err, $out) = run_command($cmd);
 			if ($err) {
 				push (@components_error, $checkout);
 				return $err;
 			}
             if (defined($branch)) {
                 #chdir("$hg_repo");
-                my $err = run_command("hg --repository $repo_loc checkout $branch");
+                my ($err, $out) = run_command("hg --repository $repo_loc checkout $branch");
                 if ($err) {
                 	push (@components_error, $checkout);
                 	run_command("mv $repo_loc $repo_loc-branch-failed");
@@ -1853,7 +1855,7 @@ sub handle_hg
             }
             if (defined $date) {
                 #chdir("$hg_repo");
-                my $err = run_command("hg --repository $repo_loc checkout --date $date");
+                my ($err, $out) = run_command("hg --repository $repo_loc checkout --date $date");
                 if ($err) {
                 	push (@components_error, $checkout);
                 	run_command("mv $repo_loc $repo_loc-date-failed");
@@ -1873,16 +1875,18 @@ sub handle_hg
         elsif ($updated_hg_repos{$hg_repo} == 0) {
             #chdir("$orig_dir/$ROOT/repos/$hg_repo");
             print_checkout_info($checkout, $url, $target, $name);
-            my $err = run_command("$hg --repository $repo_loc pull");
+            my ($err, $out) = run_command("$hg --repository $repo_loc pull");
 			if ($err) {
 				push (@components_error, $checkout);
 				return;
 			}
             if (defined($branch)) {
-                run_command("hg --repository $repo_loc checkout $branch") == 0 or push (@components_error, $checkout);
+                ($err, $out) = run_command("hg --repository $repo_loc checkout $branch");
+                push (@components_error, $checkout) if $err;
             }
             if (defined $date) {
-                run_command("hg --repository $repo_loc checkout --date $date") == 0 or push (@components_error, $checkout);
+                ($err, $out) = run_command("hg --repository $repo_loc checkout --date $date");
+                push (@components_error, $checkout) if $err;
             }
             $updated_hg_repos{$hg_repo} = 1;
             #chdir($orig_dir);
@@ -1926,7 +1930,7 @@ sub handle_hg
                 if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
             }
             #return if (-e "$checkout_item");
-            my $err = run_command($cmd);
+            my ($err, $out) = run_command($cmd);
             if ($err) {push (@components_error, $checkout.": symlink error.")}
 
             if ($PARALLEL) {
@@ -1939,7 +1943,7 @@ sub handle_hg
                         "$ln $hg_repos_dir/$hg_repo $name";
                 if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
                 return if (-e "$target_dir/$name");
-                my $err = run_command($cmd);
+                my ($err, $out) = run_command($cmd);
                 if ($err) {push (@components_error, $checkout.": symlink error.")}
                 if ($PARALLEL) {
                     $semaphores{$hg_repo}->up();
@@ -1951,7 +1955,7 @@ sub handle_hg
                     "$ln $hg_repos_dir/$hg_repo/$checkout $checkout_item";
             if ($orig_dir eq $ROOT) {$cmd =~ s!$orig_dir/!!}
             return if (-e "$target_dir/$checkout_item");
-            my $err = run_command($cmd);
+            my ($err, $out) = run_command($cmd);
             if ($err) {push (@components_error, $checkout.": symlink error.")}
 
             if ($PARALLEL) {
@@ -1974,13 +1978,15 @@ sub handle_hg
             }
             #chdir($orig_dir);
             print_update_info($checkout, $url, $target, $name);
-            my $err = run_command("$hg --repository $repo_loc pull --update");
+            my ($err, $out) = run_command("$hg --repository $repo_loc pull --update");
             if ($err) {push (@components_error, $checkout);}
             if (defined($branch)) {
-                run_command("hg --repository $repo_loc checkout $branch") == 0 or push (@components_error, $checkout);
+                ($err, $out) = run_command("hg --repository $repo_loc checkout $branch");
+                push (@components_error, $checkout) if $err;
             }
             if (defined($date)) {
-                run_command("hg --repository $repo_loc checkout --date $date") == 0 or push (@components_error, $checkout);
+                ($err, $out) = run_command("hg --repository $repo_loc checkout --date $date");
+                push (@components_error, $checkout) if $err;
             }
             $updated_hg_repos{$hg_repo} = 1;
             #chdir($orig_dir);
@@ -2073,65 +2079,11 @@ sub run_command
     my $verbose = defined $VERBOSE_OVERRIDE ? $VERBOSE_OVERRIDE : $VERBOSE;
     my $err = defined $show_err ? '' : ' 2>&1';
     if ($command =~ /^$/) {return}
-    # for verbose we will not collect output as everything will go to stdout
+    print "Executing: $command\n" if $verbose;
     my $out = `$command$err`;
     my $ret = $?;
     print $out if $verbose;
     return ($ret, $out);
-    # if for some reason $VERBOSE has been set to a value higher than 2, we 
-    # will assume the user wants full verbosity
-=begin comment
-    # if $VERBOSE == 2 we will print the current directory, the command, and 
-    # all output from the command
-    if ($VERBOSE >= 2) {
-        print "cwd = ".cwd()."\n";
-        print "$command\n";
-        open (my $output, "$command 2>&1 |");
-        while (<$output>) {
-            if (/^cvs|^svn|^error|^fatal|^abort/) {
-                $out .= $_;
-            }
-            print;
-        }
-        close $output; # to get $?
-        my $errno = $?;
-        LOG("Could not run command: $command\ncwd = ".cwd()."\n$out") if $errno;
-        return $errno;
-    }
-    # if $VERBOSE == 1 we will print the current directory, the command, and
-    # any output directed to STDERR (testing the last part to see if it's
-    # useful). we will not show any "which" or "mkdir" commands in this level.
-    elsif ($VERBOSE == 1 && !($command =~ m{^ln|^mkdir|^mv|^rm|^rmdir|^which})) {
-        print "cwd = ".cwd()."\n";
-        print "$command\n";
-        open (my $output, "$command 2>&1 1>/dev/null |");
-        while (<$output>) {
-            if (/^cvs|^svn|^error|^fatal|^abort/) {
-                $out .= $_;
-            }
-            print;
-        }
-        close $output; # to get $?
-        my $errno = $?;
-        LOG("Could not run command: $command\ncwd = ".cwd()."\n$out") if $errno;
-        return $errno;
-    }
-    # if $VERBOSE == 0 we will suppress all output from the command, except for errors
-    else {
-        open (my $output, "$command 2>&1 |");
-        while (<$output>) {
-            if (/^cvs|^svn|^error|^fatal|^abort/ || $VERBOSE_OVERRIDE) {
-                $out .= $_;
-                print;
-            }
-        }
-        close $output; # to get $?
-        my $errno = $?;
-        LOG("Could not run command: $command\ncwd = ".cwd()."\n$out") if $errno;
-        return $errno;
-   }
-=end comment
-=cut
 }
 
 sub info
