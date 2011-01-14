@@ -1213,11 +1213,17 @@ sub handle_git {
                   . "git checkout --track -b $branch origin/$branch";
                 my ( $err, $out ) = run_command($cmd);
                 if ($err) {
-                    run_command("mv $repo_loc $repo_loc-branch-failed");
+                    # add timestamp
+                    my ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, 
+                        $isdst ) = localtime;
+                    $year += 1900;
+                    $mon++;
+                    my $new = "$repo_loc.branch.failed.$mon.$mday.$year";
+                    run_command("mv $repo_loc $new");
                     $updated_git_repos{$git_repo} = -1;
                     my $log = 
                         "Could not checkout $checkout, "
-                      . "unable to switch to branch $branch."
+                      . "unable to switch to branch $branch. "
                       . "Any existing symlinks to $checkout will be broken";
                     WARN($log);
                     push( @components_error, $checkout.": symlinks may be broken" );
@@ -1977,11 +1983,16 @@ sub handle_hg {
                 my ( $err, $out ) =
                   run_command("hg --repository $repo_loc checkout $branch");
                 if ($err) {
-                    push( @components_error, $checkout );
-                    run_command("mv $repo_loc $repo_loc-branch-failed");
+                    # add timestamp
+                    my ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, 
+                        $isdst ) = localtime;
+                    $year += 1900;
+                    $mon++;
+                    my $new = "$repo_loc.branch.failed.$mon.$mday.$year";
+                    run_command("mv $repo_loc $new");
                     $updated_hg_repos{$hg_repo} = -1;
                     my $log = "Could not checkout $checkout, "
-                      . "unable to switch to branch $branch."
+                      . "unable to switch to branch $branch. "
                       . "Any existing symlinks to $checkout will be broken.";
                     WARN($log);
                     push( @components_error, $checkout.": symlinks may be broken" );
@@ -1994,11 +2005,16 @@ sub handle_hg {
                 my ( $err, $out ) = run_command(
                     "hg --repository $repo_loc checkout --date $date");
                 if ($err) {
-                    push( @components_error, $checkout );
-                    run_command("mv $repo_loc $repo_loc-date-failed");
+                    # add timestamp
+                    my ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, 
+                        $isdst ) = localtime;
+                    $year += 1900;
+                    $mon++;
+                    my $new = "$repo_loc.date.failed.$mon.$mday.$year";
+                    run_command("mv $repo_loc $new");
                     $updated_hg_repos{$hg_repo} = -1;
                     my $log = "Could not checkout $checkout, "
-                      . "unable to checkout from date $date."
+                      . "unable to checkout from date $date. "
                       . "Any existing symlinks to $checkout will be broken.";
                     WARN($log);
                     push( @components_error, $checkout.": symlinks may be broken" );
