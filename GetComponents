@@ -1036,10 +1036,10 @@ sub handle_svn {
     my $name     = $component{"NAME"};
     my $cmd      = '';
     my $user =
-      defined( $component{USER} ) ? "--username $component{USER}" : ' ';
+      defined( $component{USER} ) ? " --username $component{USER}" : '';
     my $err  = 0;
     my $out  = '';
-    my $date = defined $DATE ? "-r {$DATE}" : ' ';
+    my $date = defined $DATE ? " -r {$DATE}" : '';
 
     my $bad_cert = 0;
     my $url      = $component{"URL"};
@@ -1056,7 +1056,7 @@ sub handle_svn {
 
         run_command("mkdir -p $target");
         my $dir = defined($name) ? $name : $checkout;
-        $cmd = "$svn checkout $user $date $url $orig_dir/$target/$dir";
+        $cmd = "$svn checkout$user$date $url $orig_dir/$target/$dir";
 
         print_checkout_info( $checkout, $url, $target, $name );
 
@@ -1086,6 +1086,13 @@ sub handle_svn {
             $log .= $out;
             WARN($log);
             push( @components_error, $checkout );
+        }
+        # check for possible conflicts
+        if ( $out =~ /^C\s+/m ) {
+            my $log = "Module $checkout has conflicts, don't forget to resolve\n";
+            WARN($log);
+            push( @components_error, $checkout.": conflict during update");
+            $err = 1;
         }
         return $err;
     }
@@ -2258,9 +2265,16 @@ sub run_command {
     my $VERBOSE_OVERRIDE = shift;
     my $show_err         = shift;
     my $verbose = defined $VERBOSE_OVERRIDE ? $VERBOSE_OVERRIDE : $VERBOSE;
-    my $err = defined $show_err ? '' : ' 2>&1';
+    my $err     = defined $show_err ? '' : ' 2>&1';
     if ( $command =~ /^$/ ) { return }
-    print BOLD, "Executing:", RESET, " $command\n" if $verbose;
+    if ( $verbose ) {
+        if ( $command =~ /^cd (.*) \&\& (.*)$/ ) {
+            my ($cmd, $loc) = ($2, $1);
+            print BOLD, "Executing: ", RESET, "$cmd\n",
+                  BOLD, "       In: ", RESET, "$loc\n";
+        }
+        else { print BOLD, "Executing: ", RESET, "$command\n" }
+    }
     my $out = `$command$err`;
     my $ret = $?;
     print $out if $verbose;
