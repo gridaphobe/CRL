@@ -2425,9 +2425,8 @@ Print the full man page and exit.
 
 =item B<--verbose>
 
-Print all system commands as they are executed by script. A second level of 
-verbosity, declared by -v -v, will also display the output from the system 
-commands.
+Print all system commands as they are executed by script, as well as output
+from the commands.
 
 =item B<--debug>
 
