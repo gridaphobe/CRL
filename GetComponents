@@ -224,20 +224,20 @@ sub download_list {
     my $file = $url;
     $file =~ s!.*/!!;
     if ($curl_found) {
-        run_command("$curl '$url' -o $file") == 0 and return;
+        system("$curl --silent '$url' -o $file") == 0 and return;
     }
-    run_command("$wget '$url' -O $file") == 0 and return;
+    system("$wget --quiet '$url' -O $file") == 0 and return;
     DIE("Couldn't download $url correctly.");
 }
 
 sub find_tools {
-    if    ( system("which -s $cvs") == 0 )  { $cvs_found  = 1 }
-    if    ( system("which -s $svn") == 0 )  { $svn_found  = 1 }
-    if    ( system("which -s $git") == 0 )  { $git_found  = 1 }
-    if    ( system("which -s $curl") == 0 ) { $curl_found = 1; $curl .= " -f" }
-    elsif ( system("which -s $wget") == 0 ) { $wget_found = 1 }
-    if ( system("which -s $darcs") == 0 ) { $darcs_found = 1 }
-    if ( system("which -s $hg") == 0 )    { $hg_found    = 1 }
+    if    ( system("which $cvs >/dev/null") == 0 )  { $cvs_found  = 1 }
+    if    ( system("which $svn >/dev/null") == 0 )  { $svn_found  = 1 }
+    if    ( system("which $git >/dev/null") == 0 )  { $git_found  = 1 }
+    if    ( system("which $curl >/dev/null") == 0 ) { $curl_found = 1; $curl .= " -f" }
+    elsif ( system("which $wget >/dev/null") == 0 ) { $wget_found = 1 }
+    if ( system("which $darcs >/dev/null") == 0 ) { $darcs_found = 1 }
+    if ( system("which $hg >/dev/null") == 0 )    { $hg_found    = 1 }
     if ($cvs_found) {
 
         # Use compression to speed up slow links, and to avoid
