@@ -38,6 +38,7 @@ use Getopt::Long;
 use Pod::Usage;
 use File::stat;
 use Cwd;
+use Term::ANSIColor qw(:constants);
 
 # import optional threading modules
 my $PARALLEL;
@@ -325,7 +326,7 @@ sub parse_list {
                     and $DEFINITIONS{$def} ne $value )
                 {
                     if ($EXPERIMENTAL) {
-                        WARN_nonfatal("Repeated definition of $def, ignored");
+                        WARN("Repeated definition of $def, ignored");
                     }
                     else {
                         DIE("Repeated definition of $def");
@@ -395,7 +396,7 @@ sub parse_list {
         }
 
         if ( !defined( $rec{"CHECKOUT"} ) ) {
-            WARN_nonfatal("Nothing will be checked out from $rec{URL}\n");
+            WARN("Nothing will be checked out from $rec{URL}\n");
             next;
         }
         chomp %rec;
@@ -946,10 +947,10 @@ sub handle_cvs {
         print_checkout_info( $checkout, $url, $target, $name );
         my ( $err, $out ) = run_command($cmd);
         if ( $err != 0 || $out =~ /^cvs:/gmi ) {
-            my $log = "ERROR: Could not check out module $checkout\n";
+            my $log = "Could not check out module $checkout\n";
             $out =~ s'^(?!\S*:\s).*$''gmi;
             $log .= $out;
-            WARN_nonfatal($log);
+            WARN($log);
             push( @components_error, $checkout );
         }
         return $err;
@@ -964,10 +965,10 @@ sub handle_cvs {
         print_update_info( $checkout, $url, $target, $name );
         my ( $err, $out ) = run_command($cmd);
         if ( $err != 0 || $out =~ /^cvs:/gmi ) {
-            my $log = "ERROR: Could not update module $checkout\n";
+            my $log = "Could not update module $checkout\n";
             $out =~ s'^(?!\S*:\s).*$''gmi;
             $log .= $out;
-            WARN_nonfatal($log);
+            WARN($log);
             push( @components_error, $checkout );
         }
         return $err;
@@ -1063,10 +1064,10 @@ sub handle_svn {
         # server certificate issues
         ( $err, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
         if ( $err || $out =~ /^svn/gmi ) {
-            my $log = "ERROR: Could not checkout module $checkout\n";
+            my $log = "Could not checkout module $checkout\n";
             $out =~ s/^(?!svn).*$//gmi;
             $log .= $out;
-            WARN_nonfatal($log);
+            WARN($log);
             push( @components_error, $checkout );
         }
         return $err;
@@ -1080,10 +1081,10 @@ sub handle_svn {
         print_update_info( $checkout, $url, $target, $name );
         ( $err, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
         if ( $err || $out =~ /^svn/gmi ) {
-            my $log = "ERROR: Could not update module $checkout\n";
+            my $log = "Could not update module $checkout\n";
             $out =~ s/^(?!svn).*$//gmi;
             $log .= $out;
-            WARN_nonfatal($log);
+            WARN($log);
             push( @components_error, $checkout );
         }
         return $err;
@@ -1193,10 +1194,10 @@ sub handle_git {
             print_checkout_info( $checkout, $url, $target, $name );
             my ( $err, $out ) = run_command($cmd);
             if ($err) {
-                my $log = "ERROR: Could not checkout module $checkout\n";
+                my $log = "Could not checkout module $checkout\n";
                 $out =~ s/^(?!fatal).*$//gmi;
                 $log .= $out;
-                WARN_nonfatal($log);
+                WARN($log);
                 push( @components_error, $checkout );
                 return $err;
             }
@@ -1630,10 +1631,10 @@ sub handle_darcs {
             print_checkout_info( $checkout, $url, $target, $name );
             my ( $err, $out ) = run_command($cmd);
             if ($err) {
-                my $log = "ERROR: Could not checkout module $checkout\n";
+                my $log = "Could not checkout module $checkout\n";
                 $out =~ s/^(?!darcs).*$//gmi;
                 $log .= $out;
-                WARN_nonfatal($log);
+                WARN($log);
                 push( @components_error, $checkout );
                 return $err;
             }
@@ -1648,10 +1649,10 @@ sub handle_darcs {
             print_checkout_info( $checkout, $url, $target, $name );
             my ( $err, $out ) = run_command("$darcs pull --repodir=$repo_loc");
             if ($err) {
-                my $log = "ERROR: Could not checkout module $checkout\n";
+                my $log = "Could not checkout module $checkout\n";
                 $out =~ s/^(?!darcs).*$//gmi;
                 $log .= $out;
-                WARN_nonfatal($log);
+                WARN($log);
                 push( @components_error, $checkout );
                 return $err;
             }
@@ -1762,10 +1763,10 @@ sub handle_darcs {
             print_update_info( $checkout, $url, $target, $name );
             my ( $err, $out ) = run_command("$darcs pull --repodir=$repo_loc");
             if ($err) { 
-                my $log = "ERROR: Could not update module $checkout\n";
+                my $log = "Could not update module $checkout\n";
                 $out =~ s/^(?!darcs).*$//gmi;
                 $log .= $out;
-                WARN_nonfatal($log);
+                WARN($log);
                 push( @components_error, $checkout ); 
                 }
             $updated_darcs_repos{$darcs_repo} = 1;
@@ -1965,15 +1966,14 @@ sub handle_hg {
         # clone the hg repo
         if ( !-e $repo_loc ) {
 
-            #chdir("$orig_dir/$ROOT/repos");
             $cmd = "$hg clone $url $repo_loc";
             print_checkout_info( $checkout, $url, $target, $name );
             my ( $err, $out ) = run_command($cmd);
             if ($err) {
-                my $log = "ERROR: Could not checkout module $checkout\n";
+                my $log = "Could not checkout module $checkout\n";
                 $out =~ s/^(?!abort).*$//gmi;
                 $log .= $out;
-                WARN_nonfatal($log);
+                WARN($log);
                 push( @components_error, $checkout );
                 return $err;
             }
@@ -2026,10 +2026,10 @@ sub handle_hg {
             print_checkout_info( $checkout, $url, $target, $name );
             my ( $err, $out ) = run_command("$hg --repository $repo_loc pull");
             if ($err) {
-                my $log = "ERROR: Could not checkout module $checkout\n";
+                my $log = "Could not checkout module $checkout\n";
                 $out =~ s/^(?!abort).*$//gmi;
                 $log .= $out;
-                WARN_nonfatal($log);
+                WARN($log);
                 push( @components_error, $checkout );
                 return $err;
             }
@@ -2148,10 +2148,10 @@ sub handle_hg {
             my ( $err, $out ) =
               run_command("$hg --repository $repo_loc pull --update");
             if ($err) { 
-                my $log = "ERROR: Could not update module $checkout\n";
+                my $log = "Could not update module $checkout\n";
                 $out =~ s/^(?!abort).*$//gmi;
                 $log .= $out;
-                WARN_nonfatal($log);
+                WARN($log);
                 push( @components_error, $checkout ); 
             }
             if ( defined($branch) ) {
@@ -2260,7 +2260,7 @@ sub run_command {
     my $verbose = defined $VERBOSE_OVERRIDE ? $VERBOSE_OVERRIDE : $VERBOSE;
     my $err = defined $show_err ? '' : ' 2>&1';
     if ( $command =~ /^$/ ) { return }
-    print "Executing: $command\n" if $verbose;
+    print BOLD, "Executing:", RESET, " $command\n" if $verbose;
     my $out = `$command$err`;
     my $ret = $?;
     print $out if $verbose;
@@ -2312,9 +2312,6 @@ sub print_summary {
         my $logmsg = "Updated from thornlist(s): ";
         $logmsg .= join( ' , ', @ORIG_LISTS );
 
-        #for my $list (@CRL_LISTS) {
-        #	$logmsg .= "$list, ";
-        #}
         &LOG($logmsg);
     }
     else {
@@ -2359,20 +2356,13 @@ sub LOG {
 sub WARN {
     my $warning = shift;
     LOG($warning);
-    warn("\n$warning\n\n");
-    die;
-}
-
-sub WARN_nonfatal {
-    my $warning = shift;
-    LOG($warning);
-    warn("\n$warning\n\n");
+    warn("\n", BOLD, RED, "Warning: ", RESET, "$warning\n\n");
 }
 
 sub DIE {
     my $error = shift;
     LOG($error);
-    die("\n$error\n\n");
+    die("\n", BOLD, RED, "Error: ", RESET, "$error\n\n");
 }
 
 __END__
