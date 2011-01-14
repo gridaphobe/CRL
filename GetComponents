@@ -39,6 +39,7 @@ use Pod::Usage;
 use File::stat;
 use Cwd;
 use Term::ANSIColor qw(:constants);
+use POSIX qw(strftime);
 
 # import optional threading modules
 my $PARALLEL;
@@ -1247,11 +1248,8 @@ sub handle_git {
                 my ( $err, $out ) = run_command($cmd);
                 if ($err) {
                     # add timestamp
-                    my ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, 
-                        $isdst ) = localtime;
-                    $year += 1900;
-                    $mon++;
-                    my $new = "$repo_loc.branch.failed.$mon.$mday.$year";
+                    my $timestamp = strftime "%M.%d.%Y", localtime;
+                    my $new = "$repo_loc.branch.failed.$timestamp";
                     run_command("mv $repo_loc $new");
                     $updated_git_repos{$git_repo} = -1;
                     my $log = 
@@ -1596,11 +1594,9 @@ sub handle_curl {
         }
 
         # add modification timestamp to old version
-        my ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst ) =
-          localtime( stat("$target/$checkout")->mtime );
-        $year += 1900;
-        $mon++;
-        my $temp = "$mon.$mday.$year.$checkout";
+        my $timestamp = strftime "%M.%d.%Y", localtime( 
+                    stat("$target/$checkout")->mtime );
+        my $temp = "$timestamp.$checkout";
         run_command("mv $target/$checkout $target/$temp");
         print_update_info( $checkout, $url, $target, $name );
         my ( $err, $out ) = run_command($cmd);
@@ -1935,11 +1931,9 @@ sub handle_wget {
         }
 
         # add modification timestamp to old version
-        my ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst ) =
-          localtime( stat("$target/$checkout")->mtime );
-        $year += 1900;
-        $mon++;
-        my $temp = "$mon.$mday.$year.$checkout";
+        my $timestamp = strftime "%M.%d.%Y", localtime( 
+                    stat("$target/$checkout")->mtime );
+        my $temp = "$timestamp.$checkout";
         run_command("mv $target/$checkout $target/$temp");
         print_update_info( $checkout, $url, $target, $name );
         my ( $err, $out ) = run_command($cmd);
@@ -2017,11 +2011,8 @@ sub handle_hg {
                   run_command("hg --repository $repo_loc checkout $branch");
                 if ($err) {
                     # add timestamp
-                    my ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, 
-                        $isdst ) = localtime;
-                    $year += 1900;
-                    $mon++;
-                    my $new = "$repo_loc.branch.failed.$mon.$mday.$year";
+                    my $timestamp = strftime "%M.%d.%Y", localtime;
+                    my $new = "$repo_loc.branch.failed.$timestamp";
                     run_command("mv $repo_loc $new");
                     $updated_hg_repos{$hg_repo} = -1;
                     my $log = "Could not checkout $checkout, "
@@ -2039,11 +2030,8 @@ sub handle_hg {
                     "hg --repository $repo_loc checkout --date $date");
                 if ($err) {
                     # add timestamp
-                    my ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, 
-                        $isdst ) = localtime;
-                    $year += 1900;
-                    $mon++;
-                    my $new = "$repo_loc.date.failed.$mon.$mday.$year";
+                    my $timestamp = strftime "%M.%d.%Y", localtime;
+                    my $new = "$repo_loc.branch.failed.$timestamp";
                     run_command("mv $repo_loc $new");
                     $updated_hg_repos{$hg_repo} = -1;
                     my $log = "Could not checkout $checkout, "
@@ -2390,10 +2378,8 @@ sub LOG {
         }
     }
     open( my $logfile, '>>', "$crl_dir/crl.log" ) or die $!;
-    my ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst ) =
-      localtime(time);
-    my @abbr = qw( Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec );
-    print {$logfile} "$abbr[$mon] $mday, $hour:$min:$sec:  $log\n";
+    my $timestamp = strftime "%b %e %H:%M:%S %Y", localtime;
+    print {$logfile} "$timestamp:\t$log\n";
     close $logfile or die $!;
 }
 
