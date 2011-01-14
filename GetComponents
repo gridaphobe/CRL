@@ -1630,6 +1630,10 @@ sub handle_darcs {
             print_checkout_info( $checkout, $url, $target, $name );
             my ( $err, $out ) = run_command($cmd);
             if ($err) {
+                my $log = "ERROR: Could not checkout module $checkout\n";
+                $out =~ s/^(?!darcs).*$//gmi;
+                $log .= $out;
+                WARN_nonfatal($log);
                 push( @components_error, $checkout );
                 return $err;
             }
@@ -1644,6 +1648,10 @@ sub handle_darcs {
             print_checkout_info( $checkout, $url, $target, $name );
             my ( $err, $out ) = run_command("$darcs pull --repodir=$repo_loc");
             if ($err) {
+                my $log = "ERROR: Could not checkout module $checkout\n";
+                $out =~ s/^(?!darcs).*$//gmi;
+                $log .= $out;
+                WARN_nonfatal($log);
                 push( @components_error, $checkout );
                 return $err;
             }
@@ -1694,7 +1702,6 @@ sub handle_darcs {
                 if ( $orig_dir eq $ROOT ) { $cmd =~ s!$orig_dir/!! }
             }
 
-            #return if (-e "$checkout_item");
             my ( $err, $out ) = run_command($cmd);
             if ($err) {
                 push( @components_error, $checkout . ": symlink error." );
@@ -1720,7 +1727,6 @@ sub handle_darcs {
                 $semaphores{$darcs_repo}->up();
             }
 
-            #chdir($orig_dir);
             return $err;
         }
         else {
@@ -1753,13 +1759,17 @@ sub handle_darcs {
                       . "$ln ../darcs-repos/$darcs_repo $darcs_repo" );
             }
 
-            #chdir($orig_dir);
             print_update_info( $checkout, $url, $target, $name );
             my ( $err, $out ) = run_command("$darcs pull --repodir=$repo_loc");
-            if ($err) { push( @components_error, $checkout ); }
+            if ($err) { 
+                my $log = "ERROR: Could not update module $checkout\n";
+                $out =~ s/^(?!darcs).*$//gmi;
+                $log .= $out;
+                WARN_nonfatal($log);
+                push( @components_error, $checkout ); 
+                }
             $updated_darcs_repos{$darcs_repo} = 1;
 
-            #chdir($orig_dir);
 
             if ($PARALLEL) {
                 $semaphores{$darcs_repo}->up();
@@ -1960,6 +1970,10 @@ sub handle_hg {
             print_checkout_info( $checkout, $url, $target, $name );
             my ( $err, $out ) = run_command($cmd);
             if ($err) {
+                my $log = "ERROR: Could not checkout module $checkout\n";
+                $out =~ s/^(?!abort).*$//gmi;
+                $log .= $out;
+                WARN_nonfatal($log);
                 push( @components_error, $checkout );
                 return $err;
             }
@@ -2012,8 +2026,12 @@ sub handle_hg {
             print_checkout_info( $checkout, $url, $target, $name );
             my ( $err, $out ) = run_command("$hg --repository $repo_loc pull");
             if ($err) {
+                my $log = "ERROR: Could not checkout module $checkout\n";
+                $out =~ s/^(?!abort).*$//gmi;
+                $log .= $out;
+                WARN_nonfatal($log);
                 push( @components_error, $checkout );
-                return;
+                return $err;
             }
             if ( defined($branch) ) {
                 ( $err, $out ) =
@@ -2026,8 +2044,6 @@ sub handle_hg {
                 push( @components_error, $checkout ) if $err;
             }
             $updated_hg_repos{$hg_repo} = 1;
-
-            #chdir($orig_dir);
         }
 
         # if mercurial repo has already been updated, we will print checkout
@@ -2096,8 +2112,6 @@ sub handle_hg {
             if ($PARALLEL) {
                 $semaphores{$hg_repo}->up();
             }
-
-            #chdir($orig_dir);
             return $err;
         }
         else {
@@ -2130,11 +2144,16 @@ sub handle_hg {
                       . "$ln ../hg-repos/$hg_repo $hg_repo" );
             }
 
-            #chdir($orig_dir);
             print_update_info( $checkout, $url, $target, $name );
             my ( $err, $out ) =
               run_command("$hg --repository $repo_loc pull --update");
-            if ($err) { push( @components_error, $checkout ); }
+            if ($err) { 
+                my $log = "ERROR: Could not update module $checkout\n";
+                $out =~ s/^(?!abort).*$//gmi;
+                $log .= $out;
+                WARN_nonfatal($log);
+                push( @components_error, $checkout ); 
+            }
             if ( defined($branch) ) {
                 ( $err, $out ) =
                   run_command("hg --repository $repo_loc checkout $branch");
@@ -2146,8 +2165,6 @@ sub handle_hg {
                 push( @components_error, $checkout ) if $err;
             }
             $updated_hg_repos{$hg_repo} = 1;
-
-            #chdir($orig_dir);
 
             if ($PARALLEL) {
                 $semaphores{$hg_repo}->up();
@@ -2233,9 +2250,10 @@ sub handle_hg {
 }
 
 sub run_command {
-
-    # TODO: rework this function to execute command and return output and exit
-    #code. calling function will parse output
+    # run a command through the shell and return the exit code and output.
+    # can optionally override the global verbose setting and elect to let
+    # the command print to stderr (this is useful in some cases, i.e. svn
+    # will print to stderr and block if the SSL certificate is not trusted)
     my $command          = shift;
     my $VERBOSE_OVERRIDE = shift;
     my $show_err         = shift;
@@ -2312,7 +2330,6 @@ sub print_summary {
         &LOG($logmsg);
     }
 
-    #my $end_time = clock();
     my $elapsed_time = time - $start_time;
     my $min          = int( $elapsed_time / 60 );
     my $sec          = $elapsed_time % 60;
