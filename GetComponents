@@ -712,6 +712,17 @@ sub get_status {
 }
 
 sub get_diff {
+    # first reset all updated_xxx_repos hashes
+    # they are also used by get_status
+    foreach my $key (keys %updated_git_repos) {
+        $updated_git_repos{$key} = 0;
+    }
+    foreach my $key (keys %updated_darcs_repos) {
+        $updated_darcs_repos{$key} = 0;
+    }
+    foreach my $key (keys %updated_hg_repos) {
+        $updated_hg_repos{$key} = 0;
+    }
     foreach my $component (@all_components) {
         $checkout_types{ $component->{TYPE} }->( 'diff', %{$component} );
     }
@@ -1027,9 +1038,11 @@ sub handle_cvs {
         my $dir = defined($name) ? $name : $checkout;
         $cmd = "cd $target/$dir && $cvs -n -q update -dP $branch";
 
-        print "In $target/$dir:\n";
         my ( $err, $out ) = run_command($cmd);
-        print "$out\n";
+        if ( $out !~ /^$/ ) {
+            print "In $target/$dir:\n";
+            print $out;
+        }
     }
 
     elsif ( $method eq 'diff' ) {
@@ -1038,7 +1051,7 @@ sub handle_cvs {
         $cmd = "$cvs -q -d $url diff -u $target/$dir";
 
         my ( $err, $out ) = run_command($cmd);
-        print "$out\n";
+        print $out;
     }
 
     elsif ( $method eq 'authenticate' ) {
@@ -1070,8 +1083,7 @@ sub handle_cvs {
             }
         }
         close $rootfile;
-        return 1 if $same_url;
-        return 0;
+        return $same_url;
     }
 
     else { DIE("Unrecognized checkout method: $method") }
@@ -1151,9 +1163,11 @@ sub handle_svn {
 
         my $dir = defined($name) ? $name : $checkout;
         $cmd = "$svn status $target/$dir";
-        print "In $target/$dir:\n";
         my ($err, $out ) = run_command($cmd);
-        print "$out\n";
+        if ( $out !~ /^$/ ) {
+            print "In $target/$dir:\n";
+            print $out;
+        }
     }
 
     elsif ( $method eq 'diff' ) {
@@ -1162,7 +1176,7 @@ sub handle_svn {
         $cmd = "$svn diff $target/$dir";
 
         my ($err, $out ) = run_command($cmd);
-        print "$out\n";
+        print $out;
     }
 
     elsif ( $method eq 'authenticate' ) {
@@ -1449,31 +1463,35 @@ sub handle_git {
 
     elsif ( $method eq 'status' ) {
 
-        print "In $ROOT/repos/$git_repo:\n";
+        # only need to run status once per repo
+        return if $updated_git_repos{$git_repo};
+        
         my ( $err, $out ) = run_command("cd $repo_loc && $git status -s");
-        print "$out\n";
+        if ( $out !~ /^$/ ) {
+            print "In $ROOT/repos/$git_repo:\n";
+            print $out;
+        }
+        $updated_git_repos{$git_repo} = 1;
     }
 
     elsif ( $method eq 'diff' ) {
 
         # only need to run diff once per repo
         return if $updated_git_repos{$git_repo};
-
-        # help a bit with differentiating between diffs
-        print
-          "================================================================\n";
-
-        $cmd = "cd $repo_loc && $git diff --exit-code HEAD";
+        
+        $cmd = "cd $repo_loc && $git diff --exit-code";
         my ( $err, $out ) = run_command($cmd);
-        $out =~ s!^--- a/!--- a/$ROOT/repos/$git_repo/!;
-        $out =~ s!^\+\+\+ b/!\+\+\+ b/$ROOT/repos/$git_repo/!;
-        print "$out\n";
+        if ( $out !~ /^$/ ) {
+            # help a bit with differentiating between diffs
+            print
+              "================================================================\n";
+            $out =~ s!^--- a/!--- a/$ROOT/repos/$git_repo/!gm;
+            $out =~ s!^\+\+\+ b/!\+\+\+ b/$ROOT/repos/$git_repo/!gm;
+            print $out;
+        }
 
         # reuse this hash, we won't be updating anything this run..
         $updated_git_repos{$git_repo} = 1;
-
-        print
-          "================================================================\n";
     }
 
     elsif ( $method eq 'authenticate' ) {
@@ -1783,17 +1801,25 @@ sub handle_darcs {
 
     elsif ( $method eq 'status' ) {
 
-        print "In $ROOT/repos/$darcs_repo:\n";
+        return if $updated_darcs_repos{$darcs_repo};
         my $cmd = "cd $repo_loc && $darcs whatsnew";
         my ( $err, $out ) = run_command($cmd);
-        print "$out\n";
+        if ( $out !~ /^$/ ) {
+            print "In $ROOT/repos/$darcs_repo:\n";
+            print $out;
+        }
+        $updated_darcs_repos{$darcs_repo} = 1;
     }
 
     elsif ( $method eq 'diff' ) {
 
-        $cmd = "$darcs diff -u $ROOT/repos/$darcs_repo";
+        return if $updated_darcs_repos{$darcs_repo};
+        $cmd = "cd $repo_loc && $darcs diff -u";
         my ( $err, $out ) = run_command($cmd);
-        print "$out\n";
+        $out =~ s!^--- a/!--- a/$ROOT/repos/$darcs_repo/!gm;
+        $out =~ s!^\+\+\+ b/!\+\+\+ b/$ROOT/repos/$darcs_repo/!gm;
+        print $out;
+        $updated_darcs_repos{$darcs_repo} = 1;
     }
 
     elsif ( $method eq 'verify_url' ) {
@@ -2159,11 +2185,15 @@ sub handle_hg {
     }
 
     elsif ( $method eq 'status' ) {
-
-        print "In $ROOT/repos/$hg_repo:\n";
+        
+        return if $updated_hg_repos{$hg_repo};
         my $cmd = "cd $repo_loc && $hg status";
         my ( $err, $out ) = run_command($cmd);
-        print "$out\n";
+        if ( $out !~ /^$/ ) {
+            print "In $ROOT/repos/$hg_repo:\n";
+            print $out;
+        }
+        $updated_hg_repos{$hg_repo} = 1;
     }
 
     elsif ( $method eq 'diff' ) {
@@ -2171,21 +2201,18 @@ sub handle_hg {
         # only need to run diff once per repo
         return if $updated_hg_repos{$hg_repo};
 
-        # help a bit with differentiating between diffs
-        print
-          "================================================================\n";
-
         $cmd = "cd $repo_loc && $hg diff";
         my ( $err, $out ) = run_command($cmd);
-        $out =~ s!^--- a/!--- a/$ROOT/repos/$hg_repo/!gm;
-        $out =~ s!^\+\+\+ b/!\+\+\+ b/$ROOT/repos/$hg_repo/!gm;
-        print "$out\n";
-
+        if ( $out !~ /^$/ ) {
+            # help a bit with differentiating between diffs
+            print
+              "================================================================\n";
+            $out =~ s!^--- a/!--- a/$ROOT/repos/$hg_repo/!gm;
+            $out =~ s!^\+\+\+ b/!\+\+\+ b/$ROOT/repos/$hg_repo/!gm;
+            print $out;
+        }
         # reuse this hash, we won't be updating anything this run..
         $updated_hg_repos{$hg_repo} = 1;
-
-        print
-          "================================================================\n";
     }
 
     elsif ( $method eq 'verify_url' ) {
