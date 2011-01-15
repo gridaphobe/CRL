@@ -1150,19 +1150,19 @@ sub handle_svn {
     elsif ( $method eq 'status' ) {
 
         my $dir = defined($name) ? $name : $checkout;
-        chdir("$orig_dir/$target/$dir");
-        $cmd = "$svn status";
+        $cmd = "$svn status $target/$dir";
         print "In $target/$dir:\n";
-        run_command( $cmd, 1 );
+        my ($err, $out ) = run_command($cmd);
+        print "$out\n";
     }
 
     elsif ( $method eq 'diff' ) {
 
         my $dir = defined($name) ? $name : $checkout;
-        chdir("$orig_dir");
         $cmd = "$svn diff $target/$dir";
 
-        run_command( $cmd, 1 );
+        my ($err, $out ) = run_command($cmd);
+        print "$out\n";
     }
 
     elsif ( $method eq 'authenticate' ) {
@@ -1178,34 +1178,16 @@ sub handle_svn {
     }
 
     elsif ( $method eq 'verify_url' ) {
-        chdir("$orig_dir");
         my $dir = defined($name) ? $name : $checkout;
         my $cmd = "$svn info $target/$dir";
 
-        print "cwd = " . cwd() . "\n" if $VERBOSE;
-        print $cmd. "\n" if $VERBOSE;
-
-        # have to run command manually to modify output
-        # so we get paths starting with $ROOT
         my $same_url;
         $url =~ s!https?://!!;
-        open( my $output, "$cmd |" );
-        while (<$output>) {
-
-            #print;
-            if (/URL:.*$url/) {
-                $same_url = 1;
-            }
-        }
-
-        #print $url."\n";
-        return 1 if $same_url;
-        return 0;
-
+        my ( $err, $out ) = run_command($cmd);
+        return ($out =~ /URL:.*$url/);
     }
+    
     else { DIE("Unrecognized checkout method: $method") }
-
-    #return $err;
 }
 
 sub handle_git {
