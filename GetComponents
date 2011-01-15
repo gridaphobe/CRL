@@ -1044,7 +1044,7 @@ sub handle_cvs {
     elsif ( $method eq 'authenticate' ) {
 
         $cmd = "$cvs -q -n -d $url checkout $checkout > /dev/null 2>&1";
-        my $err = run_command($cmd);
+        my ( $err, $out ) = run_command($cmd);
         if ( $err != 0 ) {
 
             $cmd = "$cvs -q -d $url login";
@@ -1059,17 +1059,17 @@ sub handle_cvs {
 
     elsif ( $method eq 'verify_url' ) {
         my $dir = defined($name) ? $name : $checkout;
-        chdir("$orig_dir");
         $url =~ s/:pserver://;
         my $same_url;
 
         open( my $rootfile, "$target/$dir/CVS/Root" )
-          or die "Could not open $target/$dir/CVS/Root";
+          or DIE("Could not open $target/$dir/CVS/Root");
         while (<$rootfile>) {
             if (/$url/) {
                 $same_url = 1;
             }
         }
+        close $rootfile;
         return 1 if $same_url;
         return 0;
     }
