@@ -10,8 +10,7 @@
 !URL		= :pserver:cvs-mirror.mozilla.org:/cvsroot
 !ANON_USER	= anonymous
 !ANON_PASS	= anonymous
-!CHECKOUT	= mozilla/browser
-!NAME		= browser
+!CHECKOUT	= mozilla
 
 # Test svn repo
 !TARGET		= $ROOT/svn
