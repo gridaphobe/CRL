@@ -973,9 +973,8 @@ sub handle_cvs {
     if ( $method eq 'checkout' ) {
 
         run_command("mkdir -p $target");
-        chdir("$orig_dir/$target");
         if ( defined($name) ) {
-            die if $checkout =~ m{/};
+            #die if $checkout =~ m{/};
 
             # cvs cannot check out into the current directory.  cvs
             # also has problems checking out into subdirectory if the
@@ -985,14 +984,13 @@ sub handle_cvs {
             # then delete "tmp" again.
             my $tmpdir = ".GetComponents-tmp-$$";
             $cmd = "{ "
-              . "rm -rf $tmpdir && "
-              . "$cvs -q -d $url checkout -d $tmpdir $branch $date $checkout && "
-              . "mkdir -p $name && "
-              . "mv $tmpdir/* $name && "
-              . "rmdir $tmpdir; " . "}";
+              . "rm -rf $target/$tmpdir && "
+              . "(cd $target && "
+              . "$cvs -q -d $url checkout -d $tmpdir $branch $date $checkout) && "
+              . "mv $target/$tmpdir $target/$name; " . "}";
         }
         else {
-            $cmd = "$cvs -q -d $url checkout $date $branch $checkout";
+            $cmd = "cd $target && $cvs -q -d $url checkout $date $branch $checkout";
         }
 
         print_checkout_info( $checkout, $url, $target, $name );
@@ -1010,8 +1008,7 @@ sub handle_cvs {
     elsif ( $method eq 'update' ) {
 
         my $dir = defined($name) ? $name : $checkout;
-        chdir("$target/$dir");
-        $cmd = "$cvs -q update -dP $date $branch";
+        $cmd = "cd $target/$dir && $cvs -q update -dP $date $branch";
 
         print_update_info( $checkout, $url, $target, $name );
         my ( $err, $out ) = run_command($cmd);
