@@ -11,6 +11,7 @@
 !ANON_USER	= anonymous
 !ANON_PASS	= anonymous
 !CHECKOUT	= mozilla/browser
+!NAME		= browser
 
 # Test svn repo
 !TARGET		= $ROOT/svn
