@@ -1895,12 +1895,12 @@ sub handle_wget {
     }
 
     elsif ( $method eq 'status' ) {
-        warn "Status method not available for type: $component{TYPE}";
+        warn "Status method not available for type: $component{TYPE}\n";
         return;
     }
 
     elsif ( $method eq 'diff' ) {
-        warn "Diff method not available for type: $component{TYPE}";
+        warn "Diff method not available for type: $component{TYPE}\n";
         return;
     }
 
