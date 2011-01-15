@@ -231,14 +231,17 @@ sub download_list {
 }
 
 sub find_tools {
-    if    ( system("which $cvs >/dev/null") == 0 )  { $cvs_found  = 1 }
-    if    ( system("which $svn >/dev/null") == 0 )  { $svn_found  = 1 }
-    if    ( system("which $git >/dev/null") == 0 )  { $git_found  = 1 }
-    if    ( system("which $curl >/dev/null") == 0 ) { $curl_found = 1; $curl .= " -f" }
-    elsif ( system("which $wget >/dev/null") == 0 ) { $wget_found = 1 }
-    if ( system("which $darcs >/dev/null") == 0 ) { $darcs_found = 1 }
-    if ( system("which $hg >/dev/null") == 0 )    { $hg_found    = 1 }
-    if ($cvs_found) {
+    if ( system("which $cvs >/dev/null") == 0 ) { $cvs_found = 1 }
+    if ( system("which $svn >/dev/null") == 0 ) { $svn_found = 1 }
+    if ( system("which $git >/dev/null") == 0 ) { $git_found = 1 }
+    if ( system("which $curl >/dev/null") == 0 ) {
+        $curl_found = 1;
+        $curl .= " -f";
+    }
+    elsif ( system("which $wget >/dev/null") == 0 )  { $wget_found  = 1 }
+    if    ( system("which $darcs >/dev/null") == 0 ) { $darcs_found = 1 }
+    if    ( system("which $hg >/dev/null") == 0 )    { $hg_found    = 1 }
+    if    ($cvs_found) {
 
         # Use compression to speed up slow links, and to avoid
         # transmission errors with CCT's CVS server
@@ -414,11 +417,13 @@ sub parse_list {
             print "Please enter the path to cvs: ";
             $cvs = <STDIN>;
             chomp $cvs;
+
             # verify that we actually have cvs now...
             my $ret = system "$cvs --version >/dev/null";
             if ($ret) {
-                DIE("$cvs does not appear to be a working copy of cvs!")
-            } else { $cvs_found = 1 }
+                DIE("$cvs does not appear to be a working copy of cvs!");
+            }
+            else { $cvs_found = 1 }
         }
         if ( ( $rec{"TYPE"} eq "svn" ) && ( !$svn_found ) ) {
             print "You have requested a subversion checkout, "
@@ -426,11 +431,13 @@ sub parse_list {
             print "Please enter the path to subversion: ";
             $svn = <STDIN>;
             chomp $svn;
+
             # verify that we actually have svn now...
             my $ret = system "$svn --version >/dev/null";
             if ($ret) {
-                DIE("$svn does not appear to be a working copy of svn!")
-            } else { $svn_found = 1 }
+                DIE("$svn does not appear to be a working copy of svn!");
+            }
+            else { $svn_found = 1 }
         }
         if ( ( $rec{"TYPE"} eq "git" ) && ( !$git_found ) ) {
             print "You have requested a git checkout, "
@@ -438,11 +445,13 @@ sub parse_list {
             print "Please enter the path to git: ";
             $git = <STDIN>;
             chomp $git;
+
             # verify that we actually have git now...
             my $ret = system "$git --version >/dev/null";
             if ($ret) {
-                DIE("$git does not appear to be a working copy of git!")
-            } else { $git_found = 1 }
+                DIE("$git does not appear to be a working copy of git!");
+            }
+            else { $git_found = 1 }
         }
         if ( ( $rec{"TYPE"} eq ( "http" or "https" ) )
             && !( $wget_found || $curl_found ) )
@@ -454,19 +463,23 @@ sub parse_list {
             chomp $path;
             if ( $path =~ /curl/ ) {
                 $curl = $path;
+
                 # verify that we actually have curl now...
                 my $ret = system "$curl --version >/dev/null";
                 if ($ret) {
-                    DIE("$curl does not appear to be a working copy of curl!")
-                } else { $curl_found = 1 }
+                    DIE("$curl does not appear to be a working copy of curl!");
+                }
+                else { $curl_found = 1 }
             }
             else {
                 $wget = $path;
+
                 # verify that we actually have wget now...
                 my $ret = system "$wget --version >/dev/null";
                 if ($ret) {
-                    DIE("$wget does not appear to be a working copy of wget!")
-                } else { $wget_found = 1 }
+                    DIE("$wget does not appear to be a working copy of wget!");
+                }
+                else { $wget_found = 1 }
             }
         }
         if ( ( $rec{"TYPE"} eq "darcs" ) && ( !$darcs_found ) ) {
@@ -475,11 +488,13 @@ sub parse_list {
             print "Please enter the path to darcs: ";
             $darcs = <STDIN>;
             chomp $darcs;
+
             # verify that we actually have darcs now...
             my $ret = system "$darcs --version >/dev/null";
             if ($ret) {
-                DIE("$darcs does not appear to be a working copy of darcs!")
-            } else { $darcs_found = 1 }
+                DIE("$darcs does not appear to be a working copy of darcs!");
+            }
+            else { $darcs_found = 1 }
         }
         if ( ( $rec{"TYPE"} eq "hg" ) && ( !$hg_found ) ) {
             print "You have requested an hg checkout, "
@@ -487,11 +502,13 @@ sub parse_list {
             print "Please enter the path to hg: ";
             $hg = <STDIN>;
             chomp $hg;
+
             # verify that we actually have hg now...
             my $ret = system "$hg --version >/dev/null";
             if ($ret) {
-                DIE("$hg does not appear to be a working copy of hg!")
-            } else { $hg_found = 1 }
+                DIE("$hg does not appear to be a working copy of hg!");
+            }
+            else { $hg_found = 1 }
         }
 
         # check for svn SSL problems
@@ -1121,11 +1138,13 @@ sub handle_svn {
             WARN($log);
             push( @components_error, $checkout );
         }
+
         # check for possible conflicts
         if ( $out =~ /^C\s+/m ) {
-            my $log = "Module $checkout has conflicts, don't forget to resolve\n";
+            my $log =
+              "Module $checkout has conflicts, don't forget to resolve\n";
             WARN($log);
-            push( @components_error, $checkout.": conflict during update");
+            push( @components_error, $checkout . ": conflict during update" );
             $err = 1;
         }
         return $err;
@@ -1247,17 +1266,19 @@ sub handle_git {
                   . "git checkout --track -b $branch origin/$branch";
                 my ( $err, $out ) = run_command($cmd);
                 if ($err) {
+
                     # add timestamp
                     my $timestamp = strftime "%M.%d.%Y", localtime;
                     my $new = "$repo_loc.branch.failed.$timestamp";
                     run_command("mv $repo_loc $new");
                     $updated_git_repos{$git_repo} = -1;
-                    my $log = 
+                    my $log =
                         "Could not checkout $checkout, "
                       . "unable to switch to branch $branch. "
                       . "Any existing symlinks to $checkout will be broken";
                     WARN($log);
-                    push( @components_error, $checkout.": symlinks may be broken" );
+                    push( @components_error,
+                        $checkout . ": symlinks may be broken" );
                     return $err;
                 }
             }
@@ -1594,8 +1615,8 @@ sub handle_curl {
         }
 
         # add modification timestamp to old version
-        my $timestamp = strftime "%M.%d.%Y", localtime( 
-                    stat("$target/$checkout")->mtime );
+        my $timestamp = strftime "%M.%d.%Y",
+          localtime( stat("$target/$checkout")->mtime );
         my $temp = "$timestamp.$checkout";
         run_command("mv $target/$checkout $target/$temp");
         print_update_info( $checkout, $url, $target, $name );
@@ -1794,15 +1815,14 @@ sub handle_darcs {
 
             print_update_info( $checkout, $url, $target, $name );
             my ( $err, $out ) = run_command("$darcs pull --repodir=$repo_loc");
-            if ($err) { 
+            if ($err) {
                 my $log = "Could not update module $checkout\n";
                 $out =~ s/^(?!darcs).*$//gmi;
                 $log .= $out;
                 WARN($log);
-                push( @components_error, $checkout ); 
+                push( @components_error, $checkout );
             }
             $updated_darcs_repos{$darcs_repo} = 1;
-
 
             if ($PARALLEL) {
                 $semaphores{$darcs_repo}->up();
@@ -1931,8 +1951,8 @@ sub handle_wget {
         }
 
         # add modification timestamp to old version
-        my $timestamp = strftime "%M.%d.%Y", localtime( 
-                    stat("$target/$checkout")->mtime );
+        my $timestamp = strftime "%M.%d.%Y",
+          localtime( stat("$target/$checkout")->mtime );
         my $temp = "$timestamp.$checkout";
         run_command("mv $target/$checkout $target/$temp");
         print_update_info( $checkout, $url, $target, $name );
@@ -2010,16 +2030,19 @@ sub handle_hg {
                 my ( $err, $out ) =
                   run_command("hg --repository $repo_loc checkout $branch");
                 if ($err) {
+
                     # add timestamp
                     my $timestamp = strftime "%M.%d.%Y", localtime;
                     my $new = "$repo_loc.branch.failed.$timestamp";
                     run_command("mv $repo_loc $new");
                     $updated_hg_repos{$hg_repo} = -1;
-                    my $log = "Could not checkout $checkout, "
+                    my $log =
+                        "Could not checkout $checkout, "
                       . "unable to switch to branch $branch. "
                       . "Any existing symlinks to $checkout will be broken.";
                     WARN($log);
-                    push( @components_error, $checkout.": symlinks may be broken" );
+                    push( @components_error,
+                        $checkout . ": symlinks may be broken" );
                     return $err;
                 }
             }
@@ -2029,16 +2052,19 @@ sub handle_hg {
                 my ( $err, $out ) = run_command(
                     "hg --repository $repo_loc checkout --date $date");
                 if ($err) {
+
                     # add timestamp
                     my $timestamp = strftime "%M.%d.%Y", localtime;
                     my $new = "$repo_loc.branch.failed.$timestamp";
                     run_command("mv $repo_loc $new");
                     $updated_hg_repos{$hg_repo} = -1;
-                    my $log = "Could not checkout $checkout, "
+                    my $log =
+                        "Could not checkout $checkout, "
                       . "unable to checkout from date $date. "
                       . "Any existing symlinks to $checkout will be broken.";
                     WARN($log);
-                    push( @components_error, $checkout.": symlinks may be broken" );
+                    push( @components_error,
+                        $checkout . ": symlinks may be broken" );
                     return $err;
                 }
             }
@@ -2172,12 +2198,12 @@ sub handle_hg {
             print_update_info( $checkout, $url, $target, $name );
             my ( $err, $out ) =
               run_command("$hg --repository $repo_loc pull --update");
-            if ($err) { 
+            if ($err) {
                 my $log = "Could not update module $checkout\n";
                 $out =~ s/^(?!abort).*$//gmi;
                 $log .= $out;
                 WARN($log);
-                push( @components_error, $checkout ); 
+                push( @components_error, $checkout );
             }
             if ( defined($branch) ) {
                 ( $err, $out ) =
@@ -2275,6 +2301,7 @@ sub handle_hg {
 }
 
 sub run_command {
+
     # run a command through the shell and return the exit code and output.
     # can optionally override the global verbose setting and elect to let
     # the command print to stderr (this is useful in some cases, i.e. svn
@@ -2283,13 +2310,14 @@ sub run_command {
     my $VERBOSE_OVERRIDE = shift;
     my $show_err         = shift;
     my $verbose = defined $VERBOSE_OVERRIDE ? $VERBOSE_OVERRIDE : $VERBOSE;
-    my $err     = defined $show_err ? '' : ' 2>&1';
+    my $err = defined $show_err ? '' : ' 2>&1';
     if ( $command =~ /^$/ ) { return }
-    if ( $verbose ) {
+    if ($verbose) {
+
         if ( $command =~ /^cd (.*) \&\& (.*)$/ ) {
-            my ($cmd, $loc) = ($2, $1);
+            my ( $cmd, $loc ) = ( $2, $1 );
             print BOLD, "Executing: ", RESET, "$cmd\n",
-                  BOLD, "       In: ", RESET, "$loc\n";
+              BOLD, "       In: ", RESET, "$loc\n";
         }
         else { print BOLD, "Executing: ", RESET, "$command\n" }
     }
@@ -2386,13 +2414,13 @@ sub LOG {
 sub WARN {
     my $warning = shift;
     LOG($warning);
-    warn("\n", BOLD, RED, "Warning: ", RESET, "$warning\n\n");
+    warn( "\n", BOLD, RED, "Warning: ", RESET, "$warning\n\n" );
 }
 
 sub DIE {
     my $error = shift;
     LOG($error);
-    die("\n", BOLD, RED, "Error: ", RESET, "$error\n\n");
+    die( "\n", BOLD, RED, "Error: ", RESET, "$error\n\n" );
 }
 
 __END__
