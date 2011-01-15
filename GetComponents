@@ -1783,17 +1783,17 @@ sub handle_darcs {
 
     elsif ( $method eq 'status' ) {
 
-        chdir("$orig_dir/$ROOT/repos/$darcs_repo");
         print "In $ROOT/repos/$darcs_repo:\n";
-        run_command( "$darcs status", 1 );
+        my $cmd = "cd $repo_loc && $darcs whatsnew";
+        my ( $err, $out ) = run_command($cmd);
+        print "$out\n";
     }
 
     elsif ( $method eq 'diff' ) {
 
-        chdir("$orig_dir");
-        $cmd = "$darcs diff -u $ROOT/darcs_repos/$darcs_repo";
-
-        run_command( $cmd, 1 );
+        $cmd = "$darcs diff -u $ROOT/repos/$darcs_repo";
+        my ( $err, $out ) = run_command($cmd);
+        print "$out\n";
     }
 
     elsif ( $method eq 'verify_url' ) {
@@ -1801,26 +1801,10 @@ sub handle_darcs {
         # only need to run once per repo
         return 1 if $verified_darcs_repos{$darcs_repo};
 
-        chdir("$orig_dir/$ROOT/repos/$darcs_repo");
-
-        my $cmd = "$darcs show repo --no-files";
-
-        print "cwd = " . cwd() . "\n" if $VERBOSE;
-        print $cmd. "\n" if $VERBOSE;
-
-        # have to run command manually to modify output
-        # so we get paths starting with $ROOT
-        my $same_url;
-        open( my $output, "$cmd |" );
-        while (<$output>) {
-            if (/Default Remote: $url/) {
-                $same_url = 1;
-            }
-        }
-        chdir("$orig_dir");
+        my $cmd = "cd $repo_loc && $darcs show repo --no-files";
+        my ( $err, $out ) = run_command($cmd);
         $verified_darcs_repos{$darcs_repo} = 1;
-        return 1 if $same_url;
-        return 0;
+        return ( $out =~ /Default Remote: $url/ );
     }
 
     elsif ( $method eq 'authenticate' ) {
