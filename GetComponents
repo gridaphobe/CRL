@@ -1210,8 +1210,6 @@ sub handle_git {
     my $branch =
       defined( $component{REPO_BRANCH} ) ? $component{REPO_BRANCH} : undef;
 
-    # find a revision from $DATE
-
     my $repo_loc = "$orig_dir/$ROOT/repos/$git_repo";
 
     if ( $method eq 'checkout' ) {
@@ -1451,9 +1449,9 @@ sub handle_git {
 
     elsif ( $method eq 'status' ) {
 
-        chdir("$orig_dir/$ROOT/repos/$git_repo");
         print "In $ROOT/repos/$git_repo:\n";
-        run_command( "$git status", 1 );
+        my ( $err, $out ) = run_command("cd $repo_loc && $git status -s");
+        print "$out\n";
     }
 
     elsif ( $method eq 'diff' ) {
@@ -1465,31 +1463,17 @@ sub handle_git {
         print
           "================================================================\n";
 
-        chdir("$orig_dir/$ROOT/repos/$git_repo");
-        $cmd = "$git diff --exit-code HEAD";
-
-        print "cwd = " . cwd() . "\n" if $VERBOSE;
-        print $cmd. "\n" if $VERBOSE;
-
-        # have to run command manually to modify output
-        # so we get paths starting with $ROOT
-
-        open( my $output, "$cmd |" );
-        while (<$output>) {
-            s!^--- a/!--- a/$ROOT/repos/$git_repo/!;
-            s!^\+\+\+ b/!\+\+\+ b/$ROOT/repos/$git_repo/!;
-            print;
-        }
-        close $output;    # to get $?
+        $cmd = "cd $repo_loc && $git diff --exit-code HEAD";
+        my ( $err, $out ) = run_command($cmd);
+        $out =~ s!^--- a/!--- a/$ROOT/repos/$git_repo/!;
+        $out =~ s!^\+\+\+ b/!\+\+\+ b/$ROOT/repos/$git_repo/!;
+        print "$out\n";
 
         # reuse this hash, we won't be updating anything this run..
         $updated_git_repos{$git_repo} = 1;
 
-        if ( $? == 1 ) {
-            print
-"================================================================\n";
-        }
-
+        print
+          "================================================================\n";
     }
 
     elsif ( $method eq 'authenticate' ) {
@@ -1504,28 +1488,11 @@ sub handle_git {
 
         # only need to run once per repo
         return 1 if $verified_git_repos{$git_repo};
-
-        chdir("$orig_dir/$ROOT/repos/$git_repo");
-
-        my $cmd = "grep 'url =' .git/config";
-
-        print "cwd = " . cwd() . "\n" if $VERBOSE;
-        print $cmd. "\n" if $VERBOSE;
-
-        # have to run command manually to modify output
-        # so we get paths starting with $ROOT
-        my $same_url;
-        open( my $output, "$cmd |" );
-        while (<$output>) {
-            print if $VERBOSE;
-            if (/url = $url/) {
-                $same_url = 1;
-            }
-        }
-        chdir("$orig_dir");
+        
+        my $cmd = "cd $repo_loc && git config --get remote.origin.url";
+        my ( $err, $out ) = run_command($cmd);
         $verified_git_repos{$git_repo} = 1;
-        return 1 if $same_url;
-        return 0;
+        return ( $out =~ /$url/ );
     }
     else { DIE("Unrecognized checkout method: $method") }
 }
