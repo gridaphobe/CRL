@@ -1257,10 +1257,14 @@ sub handle_git {
                   . "git checkout --track -b $branch origin/$branch";
                 my ( $err, $out ) = run_command($cmd);
                 if ($err) {
-
-                    # add timestamp
-                    my $timestamp = strftime "%M.%d.%Y", localtime;
-                    my $new = "$repo_loc.branch.failed.$timestamp";
+                    my $new;
+                    if ( -e "$repo_loc.branch.failed" ) {
+                        my @times = glob "$repo_loc.branch.failed*";
+                        $new = "$repo_loc.branch.failed."
+                                . scalar @times;
+                    } else {
+                        $new = "$repo_loc.branch.failed"
+                    }
                     run_command("mv $repo_loc $new");
                     $updated_git_repos{$git_repo} = -1;
                     my $log =
@@ -1986,10 +1990,14 @@ sub handle_hg {
                 my ( $err, $out ) =
                   run_command("hg --repository $repo_loc checkout $branch");
                 if ($err) {
-
-                    # add timestamp
-                    my $timestamp = strftime "%M.%d.%Y", localtime;
-                    my $new = "$repo_loc.branch.failed.$timestamp";
+                    my $new;
+                    if ( -e "$repo_loc.branch.failed" ) {
+                        my @times = glob "$repo_loc.branch.failed*";
+                        $new = "$repo_loc.branch.failed."
+                                . scalar @times;
+                    } else {
+                        $new = "$repo_loc.branch.failed"
+                    }
                     run_command("mv $repo_loc $new");
                     $updated_hg_repos{$hg_repo} = -1;
                     my $log =
@@ -2008,10 +2016,14 @@ sub handle_hg {
                 my ( $err, $out ) = run_command(
                     "hg --repository $repo_loc checkout --date $date");
                 if ($err) {
-
-                    # add timestamp
-                    my $timestamp = strftime "%M.%d.%Y", localtime;
-                    my $new = "$repo_loc.branch.failed.$timestamp";
+                    my $new;
+                    if ( -e "$repo_loc.date.failed" ) {
+                        my @times = glob "$repo_loc.date.failed*";
+                        $new = "$repo_loc.date.failed."
+                                . scalar @times;
+                    } else {
+                        $new = "$repo_loc.date.failed"
+                    }
                     run_command("mv $repo_loc $new");
                     $updated_hg_repos{$hg_repo} = -1;
                     my $log =
@@ -2040,16 +2052,6 @@ sub handle_hg {
                 WARN($log);
                 push( @components_error, $checkout );
                 return $err;
-            }
-            if ( defined($branch) ) {
-                ( $err, $out ) =
-                  run_command("hg --repository $repo_loc checkout $branch");
-                push( @components_error, $checkout ) if $err;
-            }
-            if ( defined $date ) {
-                ( $err, $out ) = run_command(
-                    "hg --repository $repo_loc checkout --date $date");
-                push( @components_error, $checkout ) if $err;
             }
             $updated_hg_repos{$hg_repo} = 1;
         }
@@ -2160,16 +2162,6 @@ sub handle_hg {
                 $log .= $out;
                 WARN($log);
                 push( @components_error, $checkout );
-            }
-            if ( defined($branch) ) {
-                ( $err, $out ) =
-                  run_command("hg --repository $repo_loc checkout $branch");
-                push( @components_error, $checkout ) if $err;
-            }
-            if ( defined($date) ) {
-                ( $err, $out ) = run_command(
-                    "hg --repository $repo_loc checkout --date $date");
-                push( @components_error, $checkout ) if $err;
             }
             $updated_hg_repos{$hg_repo} = 1;
 
