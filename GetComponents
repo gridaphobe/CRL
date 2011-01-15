@@ -974,7 +974,7 @@ sub handle_cvs {
 
         run_command("mkdir -p $target");
         if ( defined($name) ) {
-            #die if $checkout =~ m{/};
+            die if $checkout =~ m{/};
 
             # cvs cannot check out into the current directory.  cvs
             # also has problems checking out into subdirectory if the
@@ -1025,20 +1025,20 @@ sub handle_cvs {
     elsif ( $method eq 'status' ) {
 
         my $dir = defined($name) ? $name : $checkout;
-        chdir("$orig_dir/$target/$dir");
-        $cmd = "$cvs -n -q update -dP $branch";
+        $cmd = "cd $target/$dir && $cvs -n -q update -dP $branch";
 
         print "In $target/$dir:\n";
-        run_command( $cmd, 1 );
+        my ( $err, $out ) = run_command($cmd);
+        print "$out\n";
     }
 
     elsif ( $method eq 'diff' ) {
 
         my $dir = defined($name) ? $name : $checkout;
-        chdir("$orig_dir");
         $cmd = "$cvs -q -d $url diff -u $target/$dir";
 
-        run_command( $cmd, 1 );
+        my ( $err, $out ) = run_command($cmd);
+        print "$out\n";
     }
 
     elsif ( $method eq 'authenticate' ) {
