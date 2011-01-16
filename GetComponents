@@ -515,7 +515,7 @@ sub parse_list {
         if ( $rec{"TYPE"} eq "svn" && defined $rec{"AUTH_URL"} ) {
             my $base = $rec{"AUTH_URL"};
             $base =~ s/(https\:\/\/[\w\.]+)\/(.*)$/$1/i;
-            unless ( $base ~~ %svn_servers ) {
+            unless ( defined $svn_servers{$base} ) {
                 my $ret = `$svn --non-interactive info $rec{AUTH_URL} 2>&1`;
                 if ( $ret =~ /Server certificate verification failed/ ) {
                     $svn_servers{$base} = 0;
