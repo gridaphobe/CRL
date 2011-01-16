@@ -1948,6 +1948,13 @@ sub handle_hg {
     my $target       = $component{"TARGET"};
     my $name         = $component{"NAME"};
     my $url          = $component{"URL"};
+    my $shallow = ' -r tip';
+    if ( defined( $component{"AUTH_URL"} ) ) {
+        $url     = $component{"AUTH_URL"};
+        $shallow = '';
+    }
+    if    ( $SHALLOW_CLONE == 1 ) { $shallow = ' -r tip' }
+    elsif ( $SHALLOW_CLONE == 0 ) { $shallow = '' }
     my $checkout     = $component{"CHECKOUT"};
     my $repo_path    = $component{"REPO_PATH"};
     my $hg_repo      = $component{"HG_REPO"};
@@ -1974,7 +1981,7 @@ sub handle_hg {
         # clone the hg repo
         if ( !-e $repo_loc ) {
 
-            $cmd = "$hg clone $url $repo_loc";
+            $cmd = "$hg clone$shallow $url $repo_loc";
             print_checkout_info( $checkout, $url, $target, $name );
             my ( $err, $out ) = run_command($cmd);
             if ($err) {
@@ -2012,7 +2019,6 @@ sub handle_hg {
             }
             if ( defined $date ) {
 
-                #chdir("$hg_repo");
                 my ( $err, $out ) = run_command(
                     "hg --repository $repo_loc checkout --date $date");
                 if ($err) {
