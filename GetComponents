@@ -1665,6 +1665,8 @@ sub handle_darcs {
     my $darcs_repo      = $component{"DARCS_REPO"};
     my $cmd             = '';
     my $darcs_repos_dir = '';
+    my $tag = defined( $component{REPO_BRANCH} ) ? 
+                " -t $component{REPO_BRANCH}" : '';
 
     my $repo_loc = "$orig_dir/$ROOT/repos/$darcs_repo";
 
@@ -1683,7 +1685,7 @@ sub handle_darcs {
 
         # clone the darcs repo
         elsif ( !-e $repo_loc ) {
-            $cmd = "$darcs clone $shallow $url"
+            $cmd = "$darcs get$shallow$tag $url"
               . " $orig_dir/$ROOT/repos/$darcs_repo";
             print_checkout_info( $checkout, $url, $target, $name );
             my ( $err, $out ) = run_command($cmd);
@@ -1703,7 +1705,7 @@ sub handle_darcs {
         elsif ( $updated_darcs_repos{$darcs_repo} == 0 ) {
 
             print_checkout_info( $checkout, $url, $target, $name );
-            my ( $err, $out ) = run_command("$darcs pull --repodir=$repo_loc");
+            my ( $err, $out ) = run_command("$darcs pull$tag --repodir=$repo_loc");
             if ($err) {
                 my $log = "Could not checkout module $checkout\n";
                 $out =~ s/^(?!darcs).*$//gmi;
@@ -1815,7 +1817,7 @@ sub handle_darcs {
             }
 
             print_update_info( $checkout, $url, $target, $name );
-            my ( $err, $out ) = run_command("$darcs pull --repodir=$repo_loc");
+            my ( $err, $out ) = run_command("$darcs pull$tag --repodir=$repo_loc");
             if ($err) {
                 my $log = "Could not update module $checkout\n";
                 $out =~ s/^(?!darcs).*$//gmi;
