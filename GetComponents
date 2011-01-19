@@ -2247,7 +2247,7 @@ sub handle_hg {
         # only need to run once per repo
         return 1 if $verified_hg_repos{$hg_repo};
 
-        my $cmd = "$hg showconfig paths.default";
+        my $cmd = "cd $repo_loc && $hg showconfig paths.default";
         my ( $err, $out ) = run_command($cmd);
         $verified_hg_repos{$hg_repo} = 1;
         return ( $out =~ /$url/ );
