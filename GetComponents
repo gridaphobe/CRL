@@ -1039,9 +1039,10 @@ sub handle_cvs {
         $cmd = "cd $target/$dir && $cvs -n -q update -dP $branch";
 
         my ( $err, $out ) = run_command($cmd);
+        $out = filter_status_output($out);
         if ( $out !~ /^$/ ) {
             print "In $target/$dir:\n";
-            print $out;
+            print "$out\n";
         }
     }
 
@@ -1164,9 +1165,10 @@ sub handle_svn {
         my $dir = defined($name) ? $name : $checkout;
         $cmd = "$svn status $target/$dir";
         my ($err, $out ) = run_command($cmd);
+        $out = filter_status_output($out);
         if ( $out !~ /^$/ ) {
             print "In $target/$dir:\n";
-            print $out;
+            print "$out\n";
         }
     }
 
@@ -1504,9 +1506,10 @@ sub handle_git {
         return if $updated_git_repos{$git_repo};
         
         my ( $err, $out ) = run_command("cd $repo_loc && $git status -s");
+        $out = filter_status_output($out);
         if ( $out !~ /^$/ ) {
             print "In $ROOT/repos/$git_repo:\n";
-            print $out;
+            print "$out\n";
         }
         $updated_git_repos{$git_repo} = 1;
     }
@@ -1843,9 +1846,10 @@ sub handle_darcs {
         return if $updated_darcs_repos{$darcs_repo};
         my $cmd = "cd $repo_loc && $darcs whatsnew";
         my ( $err, $out ) = run_command($cmd);
+        $out = filter_status_output($out);
         if ( $out !~ /^$/ ) {
             print "In $ROOT/repos/$darcs_repo:\n";
-            print $out;
+            print "$out\n";
         }
         $updated_darcs_repos{$darcs_repo} = 1;
     }
@@ -2216,9 +2220,10 @@ sub handle_hg {
         return if $updated_hg_repos{$hg_repo};
         my $cmd = "cd $repo_loc && $hg status";
         my ( $err, $out ) = run_command($cmd);
+        $out = filter_status_output($out);
         if ( $out !~ /^$/ ) {
             print "In $ROOT/repos/$hg_repo:\n";
-            print $out;
+            print "$out\n";
         }
         $updated_hg_repos{$hg_repo} = 1;
     }
@@ -2349,6 +2354,30 @@ sub print_summary {
     print "  Time Elapsed: $min minutes, $sec seconds\n\n";
 }
 
+sub filter_status_output {
+    my $output = shift;
+    my @lines = split /\n/, $output;
+    foreach my $line (@lines) {
+        if ($line =~ /^\Q?\E\s+(.*)$/) {
+            my $path = $1;
+            if ($path eq "$ROOT/repos") {
+                $line = '';
+                next;
+            }
+            foreach my $c (@all_components) {
+                my $dir = defined($c->{NAME}) ? $c->{NAME} : $c->{CHECKOUT};
+                my $checkout = "$c->{TARGET}/$dir";
+                if ($checkout =~ /$path/) {
+                    $line = '';
+                    last;
+                }
+            }
+        }
+    }
+    $output = join "\n", @lines;
+    $output =~ s/^\s*$//gm;
+    return $output;
+}
 sub LOG {
     return if $DEBUG;
 
