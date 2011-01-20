@@ -2375,7 +2375,8 @@ sub filter_status_output {
         }
     }
     $output = join "\n", @lines;
-    $output =~ s/^\s*$//gm;
+    $output =~ s/^\s*//gm;
+    chomp $output;
     return $output;
 }
 sub LOG {
