@@ -4,6 +4,7 @@
 
 File:           GetComponents
 Author:         Eric Seidel
+Version:        1.0.0
 Email:          eric@eseidel.org
 Description:    This program automates the procedure of checking out components
                 from multiple sources and mechanisms. For more info see the
