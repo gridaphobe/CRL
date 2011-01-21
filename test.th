@@ -42,4 +42,4 @@
 !TARGET		= $ROOT/http
 !TYPE		= http
 !URL	 	= http://eseidel.org/download
-!CHECKOUT	= crl-tg10.pdf
+!CHECKOUT	= crl-tg10
