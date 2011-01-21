@@ -1,0 +1,45 @@
+# Component list for testing GetComponents
+
+!CRL_VERSION = 1.0
+
+!DEFINE ROOT = TEST
+
+# Test CVS repo
+!TARGET		= $ROOT/cvs
+!TYPE		= cvs
+!URL		= :pserver:cvs-mirror.mozilla.org:/cvsroot
+!ANON_USER	= anonymous
+!ANON_PASS	= anonymous
+!CHECKOUT	= mozilla/browser
+
+# Test svn repo
+!TARGET		= $ROOT/svn
+!TYPE		= svn
+!URL		= http://svn.eseidel.org/documents/resume
+!CHECKOUT	= resume
+
+# Test git repo
+!TARGET		= $ROOT/git
+!TYPE		= git
+!URL		= git://github.com/gridaphobe/CRL.git
+!REPO_BRANCH= ET_2010_11
+!CHECKOUT	= GetComponents
+
+# Test hg repo
+!TARGET		= $ROOT/hg
+!TYPE		= hg
+!URL		= https://hg.eseidel.org/eseidel.org
+!CHECKOUT	= projects
+
+# Test darcs repo
+!TARGET     = $ROOT/darcs
+!TYPE       = darcs
+!URL        = http://darcs.net
+!REPO_BRANCH= 2.4
+!CHECKOUT   = src
+
+# Test http component
+!TARGET		= $ROOT/http
+!TYPE		= http
+!URL	 	= http://eseidel.org/download
+!CHECKOUT	= crl-tg10.pdf

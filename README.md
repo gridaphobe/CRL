@@ -11,8 +11,7 @@ GetComponents.
 
 Usage
 -----
-    ./GetComponents [options] [file]
-    ./GetComponents [options] [url]
+    ./GetComponents [options] [file|URL]
 
 GetComponents will accept a CRL file specified locally or remotely, in which case
 it will download the remote file. It can checkout and update components (also from a
@@ -30,7 +29,24 @@ checking out the [Einstein Toolkit][et]. It's an open source toolkit for solving
 relativistic equations, and is using GetComponents as its primary means of
 distribution.
 
-    ./GetComponents --anonymous http://svn.einsteintoolkit.org/branches/ET_2010_06/einsteintoolkit.th
+    ./GetComponents --anonymous http://svn.einsteintoolkit.org/branches/ET_2010_11/einsteintoolkit.th
+
+Notes
+-----
+There are 3 scripts in this repository. GetComponents is the main script and
+is fully functional. It is stable and safe to use, however there is also an
+older version in the stable branch, which coincides with the June 2010 release
+of the Einstein Toolkit. 
+
+The other scripts in the master branch are incomplete
+and unstable. py_components.py is an implementation of CRL in Python, which
+eventually will succeed the current Perl implementation when I have time to
+finish it. generateCRL.py is basically a reverse GetComponents script. It will
+analyze the contents of the working directory and generate a CRL file, 
+allowing you to checkout the same items on another computer without having
+to write the CRL yourself. It is very new and only supports svn and cvs right 
+now (it will not produce the correct checkout path if you used "cvs checkout 
+-d").
 
 Author
 ------
@@ -39,5 +55,5 @@ Author
 [eseidel]:http://www.eseidel.org
 [GetComponents]:http://www.eseidel.org/projects/GetComponents
 [cctk]:http://www.cactuscode.org
-[wiki]:http://github.com/gridaphobe/GetComponents/wiki
+[wiki]:http://github.com/gridaphobe/CRL/wiki
 [et]:http://www.einsteintoolkit.org
