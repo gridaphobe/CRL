@@ -232,16 +232,16 @@ sub download_list {
 }
 
 sub find_tools {
-    if ( system("which $cvs >/dev/null") == 0 ) { $cvs_found = 1 }
-    if ( system("which $svn >/dev/null") == 0 ) { $svn_found = 1 }
-    if ( system("which $git >/dev/null") == 0 ) { $git_found = 1 }
-    if ( system("which $curl >/dev/null") == 0 ) {
+    if ( system("which $cvs >/dev/null 2>&1") == 0 ) { $cvs_found = 1 }
+    if ( system("which $svn >/dev/null 2>&1") == 0 ) { $svn_found = 1 }
+    if ( system("which $git >/dev/null 2>&1") == 0 ) { $git_found = 1 }
+    if ( system("which $curl >/dev/null 2>&1") == 0 ) {
         $curl_found = 1;
         $curl .= " -f";
     }
-    elsif ( system("which $wget >/dev/null") == 0 )  { $wget_found  = 1 }
-    if    ( system("which $darcs >/dev/null") == 0 ) { $darcs_found = 1 }
-    if    ( system("which $hg >/dev/null") == 0 )    { $hg_found    = 1 }
+    elsif ( system("which $wget >/dev/null 2>&1") == 0 )  { $wget_found  = 1 }
+    if    ( system("which $darcs >/dev/null 2>&1") == 0 ) { $darcs_found = 1 }
+    if    ( system("which $hg >/dev/null 2>&1") == 0 )    { $hg_found    = 1 }
     if    ($cvs_found) {
 
         # Use compression to speed up slow links, and to avoid
@@ -420,7 +420,7 @@ sub parse_list {
             chomp $cvs;
 
             # verify that we actually have cvs now...
-            my $ret = system "$cvs --version >/dev/null";
+            my $ret = system "$cvs --version >/dev/null 2>&1";
             if ($ret) {
                 DIE("$cvs does not appear to be a working copy of cvs!");
             }
@@ -434,7 +434,7 @@ sub parse_list {
             chomp $svn;
 
             # verify that we actually have svn now...
-            my $ret = system "$svn --version >/dev/null";
+            my $ret = system "$svn --version >/dev/null 2>&1";
             if ($ret) {
                 DIE("$svn does not appear to be a working copy of svn!");
             }
@@ -448,7 +448,7 @@ sub parse_list {
             chomp $git;
 
             # verify that we actually have git now...
-            my $ret = system "$git --version >/dev/null";
+            my $ret = system "$git --version >/dev/null 2>&1";
             if ($ret) {
                 DIE("$git does not appear to be a working copy of git!");
             }
@@ -466,7 +466,7 @@ sub parse_list {
                 $curl = $path;
 
                 # verify that we actually have curl now...
-                my $ret = system "$curl --version >/dev/null";
+                my $ret = system "$curl --version >/dev/null 2>&1";
                 if ($ret) {
                     DIE("$curl does not appear to be a working copy of curl!");
                 }
@@ -476,7 +476,7 @@ sub parse_list {
                 $wget = $path;
 
                 # verify that we actually have wget now...
-                my $ret = system "$wget --version >/dev/null";
+                my $ret = system "$wget --version >/dev/null 2>&1";
                 if ($ret) {
                     DIE("$wget does not appear to be a working copy of wget!");
                 }
@@ -491,7 +491,7 @@ sub parse_list {
             chomp $darcs;
 
             # verify that we actually have darcs now...
-            my $ret = system "$darcs --version >/dev/null";
+            my $ret = system "$darcs --version >/dev/null 2>&1";
             if ($ret) {
                 DIE("$darcs does not appear to be a working copy of darcs!");
             }
@@ -505,7 +505,7 @@ sub parse_list {
             chomp $hg;
 
             # verify that we actually have hg now...
-            my $ret = system "$hg --version >/dev/null";
+            my $ret = system "$hg --version >/dev/null 2>&1";
             if ($ret) {
                 DIE("$hg does not appear to be a working copy of hg!");
             }
