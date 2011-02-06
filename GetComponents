@@ -1330,15 +1330,22 @@ sub handle_git {
                 }
             }
             
-            my ( $err, $out ) = run_command("cd $repo_loc && $git stash");
-            if ($err) {
-                push( @components_error, $checkout );
-                my $logmsg = "Could not update $git_repo. "
-                  . "Could not stash local changes.";
-                WARN($logmsg);
-                $updated_git_repos{$git_repo} = -1;
-                return $err;
+            # determine if we need to stash local changes
+            my ( $err, $out ) = run_command("cd $repo_loc && $git status --short --untracked-files=no");
+            my $stash = $out;
+            if ($stash) {
+                # found local changes, stash them
+                my ( $err, $out ) = run_command("cd $repo_loc && $git stash");
+                if ($err) {
+                    push( @components_error, $checkout );
+                    my $logmsg = "Could not update $git_repo. "
+                      . "Could not stash local changes.";
+                    WARN($logmsg);
+                    $updated_git_repos{$git_repo} = -1;
+                    return $err;
+                }
             }
+            
             # `git pull --rebase` will fail in detached HEAD state
             # i.e. if we have checked out a tag
             unless (defined($tag)) {
@@ -1371,19 +1378,21 @@ sub handle_git {
                     return $err;
                 }
             }
-            ( $err, $out ) = run_command("cd $repo_loc && $git stash pop");
+            
+            if ($stash) {
+                # pop stashed changes
+                ( $err, $out ) = run_command("cd $repo_loc && $git stash pop");
 
-            # `git stash pop` returns 1 if there is no stash
-            if ( $err && $out !~ /no stash found|nothing to apply/i ) {
-                push( @components_error, $checkout );
-                my $logmsg = "Could not update $git_repo. "
-                  . "Could not pop stashed changes.";
-                WARN($logmsg);
-                $updated_git_repos{$git_repo} = -1;
-                return $err;
+                # `git stash pop` returns 1 if there is no stash
+                if ($err) {
+                    push( @components_error, $checkout );
+                    my $logmsg = "Could not update $git_repo. "
+                      . "Could not pop stashed changes.";
+                    WARN($logmsg);
+                    $updated_git_repos{$git_repo} = -1;
+                    return $err;
+                }
             }
-            $err = 0 if $out =~ /no stash found|nothing to apply/i;
-
             $updated_git_repos{$git_repo} = 1
               unless $updated_git_repos{$git_repo} == -1;
         }
@@ -1500,15 +1509,22 @@ sub handle_git {
                 }
             }
 
-            my ( $err, $out ) = run_command("cd $repo_loc && $git stash");
-            if ($err) {
-                push( @components_error, $checkout );
-                my $logmsg = "Could not update $git_repo. "
-                  . "Could not stash local changes.";
-                WARN($logmsg);
-                $updated_git_repos{$git_repo} = -1;
-                return $err;
+            # determine if we need to stash local changes
+            my ( $err, $out ) = run_command("cd $repo_loc && $git status --short --untracked-files=no");
+            my $stash = $out;
+            if ($stash) {
+                # found local changes, stash them
+                my ( $err, $out ) = run_command("cd $repo_loc && $git stash");
+                if ($err) {
+                    push( @components_error, $checkout );
+                    my $logmsg = "Could not update $git_repo. "
+                      . "Could not stash local changes.";
+                    WARN($logmsg);
+                    $updated_git_repos{$git_repo} = -1;
+                    return $err;
+                }
             }
+            
             # `git pull --rebase` will fail in detached HEAD state
             # i.e. if we have checked out a tag
             unless (defined($tag)) {
@@ -1541,18 +1557,21 @@ sub handle_git {
                     return $err;
                 }
             }
-            ( $err, $out ) = run_command("cd $repo_loc && $git stash pop");
+            
+            if ($stash) {
+                # pop stashed changes
+                ( $err, $out ) = run_command("cd $repo_loc && $git stash pop");
 
-            # `git stash pop` returns 1 if there is no stash
-            if ( $err && $out !~ /no stash found|nothing to apply/i ) {
-                push( @components_error, $checkout );
-                my $logmsg = "Could not update $git_repo. "
-                  . "Could not pop stashed changes.";
-                WARN($logmsg);
-                $updated_git_repos{$git_repo} = -1;
-                return $err;
+                # `git stash pop` returns 1 if there is no stash
+                if ($err) {
+                    push( @components_error, $checkout );
+                    my $logmsg = "Could not update $git_repo. "
+                      . "Could not pop stashed changes.";
+                    WARN($logmsg);
+                    $updated_git_repos{$git_repo} = -1;
+                    return $err;
+                }
             }
-            $err = 0 if $out =~ /no stash found|nothing to apply/i;
 
             $updated_git_repos{$git_repo} = 1
               unless $updated_git_repos{$git_repo} == -1;
