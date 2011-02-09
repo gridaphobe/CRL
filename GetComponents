@@ -1522,7 +1522,7 @@ sub git_update_repo {
     my ( $git_repo, $repo_loc, $checkout, @branches ) = @_;
     
     # determine if we need to stash local changes
-    my ( $err, $out ) = run_command("cd $repo_loc && $git status --short --untracked-files=no");
+    my ( $err, $out ) = run_command("cd $repo_loc && $git status --porcelain --untracked-files=no");
     my $stash = $out;
     if ($stash) {
         # found local changes, stash them
