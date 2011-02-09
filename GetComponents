@@ -1245,7 +1245,7 @@ sub handle_git {
     my $cmd           = '';
     my $git_repos_dir = '';
     my @branches = defined $component{REPO_BRANCH} ? 
-                    split ", ", $component{REPO_BRANCH} : undef;
+                    split ", ", $component{REPO_BRANCH} : ();
     my $branch;
     my $tag;
     my $repo_loc = "$orig_dir/$ROOT/repos/$git_repo";
@@ -1565,7 +1565,7 @@ sub git_update_repo {
         # 1. branch exists locally, needs update
         # 2. branch exists remotely, needs local tracking branch
         # 3. branch is actually tag, do nothing
-        
+
         if ( `cd $repo_loc && $git branch` =~ /$branch/m ) {
             # case 1
             # checkout branch and pull --rebase
