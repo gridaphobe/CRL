@@ -319,7 +319,9 @@ sub parse_list {
         }
 
         # grab definitions
+        my $line_nr = 0;
         foreach my $line (@lines) {
+            $line_nr++;
             if ( $line =~ /^!DEFINE\s*([^\s]+)\s*=\s*(.+)/ ) {
                 my ( $def, $value ) = ( $1, $2 );
 
@@ -331,10 +333,10 @@ sub parse_list {
                     and $DEFINITIONS{$def} ne $value )
                 {
                     if ($EXPERIMENTAL) {
-                        WARN("Repeated definition of $def, ignored");
+                        WARN("Repeated definition of $def on line $line_nr, ignored");
                     }
                     else {
-                        DIE("Repeated definition of $def");
+                        DIE("Repeated definition of $def on line $line_nr");
                     }
                 }
                 else {
