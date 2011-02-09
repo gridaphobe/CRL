@@ -22,14 +22,17 @@
 !TARGET		= $ROOT/git
 !TYPE		= git
 !URL		= git://github.com/gridaphobe/CRL.git
-!REPO_BRANCH= ET_2010_11
+!REPO_BRANCH = stable, ET_2010_11
 !CHECKOUT	= GetComponents
+!NAME = GetComponents
 
 # Test hg repo
 !TARGET		= $ROOT/hg
 !TYPE		= hg
-!URL		= https://hg.eseidel.org/eseidel.org
-!CHECKOUT	= projects
+!URL		= https://hg.eseidel.org/pygravatar
+!CHECKOUT	= gravatar.py
+!REPO_BRANCH = 0.0.4
+!NAME = PyGravatar
 
 # Test darcs repo
 !TARGET     = $ROOT/darcs
@@ -37,9 +40,10 @@
 !URL        = http://darcs.net
 !REPO_BRANCH= 2.4
 !CHECKOUT   = src
+!NAME = test_darcs
 
 # Test http component
 !TARGET		= $ROOT/http
 !TYPE		= http
 !URL	 	= http://eseidel.org/download
-!CHECKOUT	= crl-tg10
+!CHECKOUT	= crl-tg10.pdf
