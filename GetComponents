@@ -1242,6 +1242,8 @@ sub handle_git {
     my $git_repo      = $component{"GIT_REPO"};
     my $cmd           = '';
     my $git_repos_dir = '';
+    my @branches = defined $component{REPO_BRANCH} ? 
+                    split ", ", $component{REPO_BRANCH} : undef;
     my $branch;
     my $tag;
     my $repo_loc = "$orig_dir/$ROOT/repos/$git_repo";
@@ -1251,6 +1253,7 @@ sub handle_git {
         if ($PARALLEL) {
             $semaphores{$git_repo}->down();
         }
+        print_checkout_info( $checkout, $url, $target, $name );
 
         run_command("mkdir -p $orig_dir/$ROOT/repos");
 
@@ -1262,7 +1265,6 @@ sub handle_git {
         # clone the git repo
         elsif ( !-e $repo_loc ) {
             $cmd = "$git clone$shallow $url $orig_dir/$ROOT/repos/$git_repo";
-            print_checkout_info( $checkout, $url, $target, $name );
             my ( $err, $out ) = run_command($cmd);
             if ($err) {
                 my $log = "Could not checkout module $checkout\n";
@@ -1275,60 +1277,65 @@ sub handle_git {
             
             # determine if we need a branch or tag checkout
             if ( defined $component{"REPO_BRANCH"} ) {
-                $branch = $component{"REPO_BRANCH"};
-                # determine if $branch is actually a tag
-                if ( `cd $repo_loc && $git tag -l` =~ /^$branch/m ) {
-                    $tag = $branch;
-                    $branch = undef;
-                }
-            }
+                @branches = split(/, /, $component{"REPO_BRANCH"});
+                my $real_branches = `cd $repo_loc && $git tag -l`;
+                for $branch (@branches) {
+                    # determine if $branch is actually a tag
+                    if ( $real_branches =~ /^$branch/m ) {
+                        $tag = $branch;
+                        $branch = undef;
+                    }
             
-            if ( defined $branch ) {
-                $cmd = "cd $repo_loc && "
-                  . "$git checkout --track -b $branch origin/$branch";
-                my ( $err, $out ) = run_command($cmd);
-                if ($err) {
-                    my $new;
-                    if ( -e "$repo_loc.branch.failed" ) {
-                        my @times = glob "$repo_loc.branch.failed*";
-                        $new = "$repo_loc.branch.failed."
-                                . scalar @times;
-                    } else {
-                        $new = "$repo_loc.branch.failed"
+                    if ( defined $branch ) {
+                        $cmd = "cd $repo_loc && "
+                          . "$git checkout --track -b $branch origin/$branch";
+                        my ( $err, $out ) = run_command($cmd);
+                        if ($err) {
+                            my $new;
+                            if ( -e "$repo_loc.branch.failed" ) {
+                                my @times = glob "$repo_loc.branch.failed*";
+                                $new = "$repo_loc.branch.failed."
+                                        . scalar @times;
+                            } else {
+                                $new = "$repo_loc.branch.failed"
+                            }
+                            run_command("mv $repo_loc $new");
+                            $updated_git_repos{$git_repo} = -1;
+                            my $log =
+                                "Could not checkout $checkout, "
+                              . "unable to switch to branch $branch. "
+                              . "Any existing symlinks to $checkout will be "
+                              . "broken";
+                            WARN($log);
+                            push( @components_error,
+                                $checkout . ": symlinks may be broken" );
+                            return $err;
+                        }
+                    } elsif ( defined $tag ) {
+                        $cmd = "cd $repo_loc && $git checkout $tag";
+                        my ( $err, $out ) = run_command($cmd);
+                        if ($err) {
+                            my $new;
+                            if ( -e "$repo_loc.branch.failed" ) {
+                                my @times = glob "$repo_loc.branch.failed*";
+                                $new = "$repo_loc.branch.failed."
+                                        . scalar @times;
+                            } else {
+                                $new = "$repo_loc.branch.failed"
+                            }
+                            run_command("mv $repo_loc $new");
+                            $updated_git_repos{$git_repo} = -1;
+                            my $log =
+                                "Could not checkout $checkout, "
+                              . "unable to switch to tag $branch. "
+                              . "Any existing symlinks to $checkout will be "
+                              . "broken";
+                            WARN($log);
+                            push( @components_error,
+                                $checkout . ": symlinks may be broken" );
+                            return $err;
+                        }
                     }
-                    run_command("mv $repo_loc $new");
-                    $updated_git_repos{$git_repo} = -1;
-                    my $log =
-                        "Could not checkout $checkout, "
-                      . "unable to switch to branch $branch. "
-                      . "Any existing symlinks to $checkout will be broken";
-                    WARN($log);
-                    push( @components_error,
-                        $checkout . ": symlinks may be broken" );
-                    return $err;
-                }
-            } elsif ( defined $tag ) {
-                $cmd = "cd $repo_loc && $git checkout $tag";
-                my ( $err, $out ) = run_command($cmd);
-                if ($err) {
-                    my $new;
-                    if ( -e "$repo_loc.branch.failed" ) {
-                        my @times = glob "$repo_loc.branch.failed*";
-                        $new = "$repo_loc.branch.failed."
-                                . scalar @times;
-                    } else {
-                        $new = "$repo_loc.branch.failed"
-                    }
-                    run_command("mv $repo_loc $new");
-                    $updated_git_repos{$git_repo} = -1;
-                    my $log =
-                        "Could not checkout $checkout, "
-                      . "unable to switch to tag $branch. "
-                      . "Any existing symlinks to $checkout will be broken";
-                    WARN($log);
-                    push( @components_error,
-                        $checkout . ": symlinks may be broken" );
-                    return $err;
                 }
             }
             $updated_git_repos{$git_repo} = 1;
@@ -1336,88 +1343,8 @@ sub handle_git {
 
         # if git repo has already been cloned, we will pull the latest version
         elsif ( $updated_git_repos{$git_repo} == 0 ) {
-            print_checkout_info( $checkout, $url, $target, $name );
-            
-            # determine if we have a branch or tag checkout
-            if ( defined $component{"REPO_BRANCH"} ) {
-                $branch = $component{"REPO_BRANCH"};
-                # determine if $branch is actually a tag
-                if ( `cd $repo_loc && $git tag -l` =~ /^$branch/m ) {
-                    $tag = $branch;
-                    $branch = undef;
-                }
-            }
-            
-            # determine if we need to stash local changes
-            my ( $err, $out ) = run_command("cd $repo_loc && $git status --short --untracked-files=no");
-            my $stash = $out;
-            if ($stash) {
-                # found local changes, stash them
-                my ( $err, $out ) = run_command("cd $repo_loc && $git stash");
-                if ($err) {
-                    push( @components_error, $checkout );
-                    my $logmsg = "Could not update $git_repo. "
-                      . "Could not stash local changes.";
-                    WARN($logmsg);
-                    $updated_git_repos{$git_repo} = -1;
-                    return $err;
-                }
-            }
-            
-            # `git pull --rebase` will fail in detached HEAD state
-            # i.e. if we have checked out a tag
-            unless (defined($tag)) {
-                ( $err, $out ) = run_command("cd $repo_loc && $git pull --rebase");
-                if ($err) {
-                    push( @components_error, $checkout );
-                    my $logmsg = "Could not update $git_repo. "
-                      . "Could not pull in remote changes.";
-                    WARN($logmsg);
-                    $updated_git_repos{$git_repo} = -1;
-                    return $err;
-                }
-            } else {
-                ( $err, $out ) = run_command("cd $repo_loc && $git fetch");
-                if ($err) {
-                    push( @components_error, $checkout );
-                    my $logmsg = "Could not update $git_repo. "
-                      . "Could not fetch remote changes.";
-                    WARN($logmsg);
-                    $updated_git_repos{$git_repo} = -1;
-                    return $err;
-                }
-                ( $err, $out ) = run_command("cd $repo_loc && $git checkout $tag");
-                if ($err) {
-                    push( @components_error, $checkout );
-                    my $logmsg = "Could not update $git_repo. "
-                      . "Could not checkout specified tag.";
-                    WARN($logmsg);
-                    $updated_git_repos{$git_repo} = -1;
-                    return $err;
-                }
-            }
-            
-            if ($stash) {
-                # pop stashed changes
-                ( $err, $out ) = run_command("cd $repo_loc && $git stash pop");
-
-                # `git stash pop` returns 1 if there is no stash
-                if ($err) {
-                    push( @components_error, $checkout );
-                    my $logmsg = "Could not update $git_repo. "
-                      . "Could not pop stashed changes.";
-                    WARN($logmsg);
-                    $updated_git_repos{$git_repo} = -1;
-                    return $err;
-                }
-            }
-            $updated_git_repos{$git_repo} = 1
-              unless $updated_git_repos{$git_repo} == -1;
+            git_update_repo( $git_repo, $repo_loc, $checkout, @branches );
         }
-
-        # if git repo has already been updated, we will print checkout info
-        # anyway to suggest that we didn't miss a module
-        else { print_checkout_info( $checkout, $url, $target, $name ) }
 
         my ( $checkout_dir, $checkout_item ) = split( /\//, $checkout );
         unless ( $checkout =~ m!/! ) {
@@ -1517,83 +1444,9 @@ sub handle_git {
             }
             print_update_info( $checkout, $url, $target, $name );
             
-            # determine if we have a branch or tag checkout
-            if ( defined $component{"REPO_BRANCH"} ) {
-                $branch = $component{"REPO_BRANCH"};
-                # determine if $branch is actually a tag
-                if ( `cd $repo_loc && $git tag -l` =~ /^$branch/m ) {
-                    $tag = $branch;
-                    $branch = undef;
-                }
-            }
-
-            # determine if we need to stash local changes
-            my ( $err, $out ) = run_command("cd $repo_loc && $git status --short --untracked-files=no");
-            my $stash = $out;
-            if ($stash) {
-                # found local changes, stash them
-                my ( $err, $out ) = run_command("cd $repo_loc && $git stash");
-                if ($err) {
-                    push( @components_error, $checkout );
-                    my $logmsg = "Could not update $git_repo. "
-                      . "Could not stash local changes.";
-                    WARN($logmsg);
-                    $updated_git_repos{$git_repo} = -1;
-                    return $err;
-                }
-            }
+            my $err = git_update_repo( $git_repo, $repo_loc, $checkout,
+                                       @branches);
             
-            # `git pull --rebase` will fail in detached HEAD state
-            # i.e. if we have checked out a tag
-            unless (defined($tag)) {
-                ( $err, $out ) = run_command("cd $repo_loc && $git pull --rebase");
-                if ($err) {
-                    push( @components_error, $checkout );
-                    my $logmsg = "Could not update $git_repo. "
-                      . "Could not pull in remote changes.";
-                    WARN($logmsg);
-                    $updated_git_repos{$git_repo} = -1;
-                    return $err;
-                }
-            } else {
-                ( $err, $out ) = run_command("cd $repo_loc && $git fetch");
-                if ($err) {
-                    push( @components_error, $checkout );
-                    my $logmsg = "Could not update $git_repo. "
-                      . "Could not fetch remote changes.";
-                    WARN($logmsg);
-                    $updated_git_repos{$git_repo} = -1;
-                    return $err;
-                }
-                ( $err, $out ) = run_command("cd $repo_loc && $git checkout $tag");
-                if ($err) {
-                    push( @components_error, $checkout );
-                    my $logmsg = "Could not update $git_repo. "
-                      . "Could not checkout specified tag.";
-                    WARN($logmsg);
-                    $updated_git_repos{$git_repo} = -1;
-                    return $err;
-                }
-            }
-            
-            if ($stash) {
-                # pop stashed changes
-                ( $err, $out ) = run_command("cd $repo_loc && $git stash pop");
-
-                # `git stash pop` returns 1 if there is no stash
-                if ($err) {
-                    push( @components_error, $checkout );
-                    my $logmsg = "Could not update $git_repo. "
-                      . "Could not pop stashed changes.";
-                    WARN($logmsg);
-                    $updated_git_repos{$git_repo} = -1;
-                    return $err;
-                }
-            }
-
-            $updated_git_repos{$git_repo} = 1
-              unless $updated_git_repos{$git_repo} == -1;
-
             if ($PARALLEL) {
                 $semaphores{$git_repo}->up();
             }
@@ -1602,7 +1455,10 @@ sub handle_git {
 
         # if git repo has already been updated print update info anyway
         # to suggest that we didn't miss a module
-        else { print_update_info( $checkout, $url, $target, $name ); return 0; }
+        else {
+            print_update_info( $checkout, $url, $target, $name );
+            return 0; 
+        }
     }
 
     elsif ( $method eq 'status' ) {
@@ -1658,6 +1514,173 @@ sub handle_git {
         return ( $out =~ /$url/ );
     }
     else { DIE("Unrecognized checkout method: $method") }
+}
+
+sub git_update_repo {
+    my ( $git_repo, $repo_loc, $checkout, @branches ) = @_;
+    
+    # determine if we need to stash local changes
+    my ( $err, $out ) = run_command("cd $repo_loc && $git status --short --untracked-files=no");
+    my $stash = $out;
+    if ($stash) {
+        # found local changes, stash them
+        my ( $err, $out ) = run_command("cd $repo_loc && $git stash");
+        if ($err) {
+            push( @components_error, $checkout );
+            my $logmsg = "Could not update $git_repo. "
+              . "Could not stash local changes.";
+            WARN($logmsg);
+            $updated_git_repos{$git_repo} = -1;
+            return $err;
+        }
+    }
+    
+    # update remote origin to make sure we can see all remote branches
+    ( $err, $out ) = run_command("cd $repo_loc && $git remote update origin");
+    if ($err) {
+        push( @components_error, $checkout );
+        my $logmsg = "Could not update $git_repo. "
+          . "Could not update remote 'origin'.";
+        WARN($logmsg);
+        $updated_git_repos{$git_repo} = -1;
+        return $err;
+    }
+    
+    # what branch/tag are we on?
+    ( $err, $out ) = run_command("cd $repo_loc && $git branch");
+    $out =~ /^\*\s*(.*)/m;
+    my $current_branch = $1;
+    if ($current_branch =~ /no branch/) {
+        # figure out which tag we're on....
+        my $commit = `cd $repo_loc && $git rev-parse HEAD`;
+        $current_branch = `cd $repo_loc && $git tag --contains $commit`;
+    }
+    
+    # now loop through specified branches, and append 'master'
+    push @branches, 'master';
+    for my $branch (@branches) {
+        # three possibilities: 
+        # 1. branch exists locally, needs update
+        # 2. branch exists remotely, needs local tracking branch
+        # 3. branch is actually tag, do nothing
+        
+        if ( `cd $repo_loc && $git branch` =~ /$branch/m ) {
+            # case 1
+            # checkout branch and pull --rebase
+            ( $err, $out ) = run_command(
+                            "cd $repo_loc && " .
+                            "$git checkout $branch && " .
+                            "$git pull --rebase origin $branch");
+            if ($err) {
+                push( @components_error, $checkout );
+                my $logmsg = "Could not update $git_repo. "
+                  . "Could not update branch $branch.";
+                WARN($logmsg);
+                $updated_git_repos{$git_repo} = -1;
+                return $err;
+            }
+        } elsif ( `cd $repo_loc && $git branch -r` =~ /$branch/m ) {
+            # dealing with a remote tracking branch
+            ( $err, $out ) = run_command(
+                        "cd $repo_loc && " .
+                        "$git checkout --track -b $branch origin/$branch");
+            if ($err) {
+                push( @components_error, $checkout );
+                my $logmsg = "Could not update $git_repo. "
+                  . "Could not create local branch for $branch.";
+                WARN($logmsg);
+                $updated_git_repos{$git_repo} = -1;
+                return $err;
+            }
+        } # no need for else statement, do nothing for tags
+    }
+    
+    # now checkout original branch
+    ( $err, $out ) = run_command("cd $repo_loc && $git checkout $current_branch");
+    if ($err) {
+        push( @components_error, $checkout );
+        my $logmsg = "Could not update $git_repo. "
+          . "Could not checkout original branch.";
+        WARN($logmsg);
+        $updated_git_repos{$git_repo} = -1;
+        return $err;
+    }
+    
+    # now pop stash if necessary
+    if ($stash) {
+        ( $err, $out ) = run_command("cd $repo_loc && $git stash pop");
+        if ($err) {
+            push( @components_error, $checkout );
+            my $logmsg = "Could not update $git_repo. "
+              . "Could not pop stashed changes.";
+            WARN($logmsg);
+            $updated_git_repos{$git_repo} = -1;
+            return $err;
+        }
+    }
+    
+    # # determine if we have a branch or tag checkout
+    # if ( @branches ) {
+    #     $branch = pop @branches;
+    #     # determine if $branch is actually a tag
+    #     if ( `cd $repo_loc && $git tag -l` =~ /^$branch/m ) {
+    #         $tag = $branch;
+    #         $branch = undef;
+    #     }
+    # }
+    # 
+    # 
+    # # `git pull --rebase` will fail in detached HEAD state
+    # # i.e. if we have checked out a tag
+    # unless (defined($tag)) {
+    #     ( $err, $out ) = run_command("cd $repo_loc && $git pull --rebase");
+    #     if ($err) {
+    #         push( @components_error, $checkout );
+    #         my $logmsg = "Could not update $git_repo. "
+    #           . "Could not pull in remote changes.";
+    #         WARN($logmsg);
+    #         $updated_git_repos{$git_repo} = -1;
+    #         return $err;
+    #     }
+    # } else {
+    #     ( $err, $out ) = run_command("cd $repo_loc && $git fetch");
+    #     if ($err) {
+    #         push( @components_error, $checkout );
+    #         my $logmsg = "Could not update $git_repo. "
+    #           . "Could not fetch remote changes.";
+    #         WARN($logmsg);
+    #         $updated_git_repos{$git_repo} = -1;
+    #         return $err;
+    #     }
+    #     ( $err, $out ) = run_command("cd $repo_loc && $git checkout $tag");
+    #     if ($err) {
+    #         push( @components_error, $checkout );
+    #         my $logmsg = "Could not update $git_repo. "
+    #           . "Could not checkout specified tag.";
+    #         WARN($logmsg);
+    #         $updated_git_repos{$git_repo} = -1;
+    #         return $err;
+    #     }
+    # }
+    # 
+    # if ($stash) {
+    #     # pop stashed changes
+    #     ( $err, $out ) = run_command("cd $repo_loc && $git stash pop");
+    # 
+    #     # `git stash pop` returns 1 if there is no stash
+    #     if ($err) {
+    #         push( @components_error, $checkout );
+    #         my $logmsg = "Could not update $git_repo. "
+    #           . "Could not pop stashed changes.";
+    #         WARN($logmsg);
+    #         $updated_git_repos{$git_repo} = -1;
+    #         return $err;
+    #     }
+    # }
+    $updated_git_repos{$git_repo} = 1
+      unless $updated_git_repos{$git_repo} == -1;
+    
+    return $err;
 }
 
 sub handle_curl {
