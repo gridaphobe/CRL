@@ -653,17 +653,17 @@ sub parse_list {
             }
 
             # slightly different approach for git
-            elsif ( $component{"TYPE"} eq "git" && -e "$target/$dir" ) {
+            elsif ( $component{"TYPE"} eq "git" && -e "$target/$checkout" ) {
                 push @{ $components_to_update{$target} }, \%component;
             }
 
             # and for darcs
-            elsif ( $component{"TYPE"} eq "darcs" && -e "$target/$dir" ) {
+            elsif ( $component{"TYPE"} eq "darcs" && -e "$target/$checkout" ) {
                 push @{ $components_to_update{$target} }, \%component;
             }
 
             # and for hg
-            elsif ( $component{"TYPE"} eq "hg" && -e "$target/$dir" ) {
+            elsif ( $component{"TYPE"} eq "hg" && -e "$target/$checkout" ) {
                 push @{ $components_to_update{$target} }, \%component;
             }
             elsif ( $component{"TYPE"} eq "http" && -e "$target/$dir" ) {
