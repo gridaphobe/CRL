@@ -529,15 +529,17 @@ sub parse_list {
 
         # parse name of git repo
         if ( $rec{"TYPE"} eq "git" ) {
+            my $git_repo;
             # check for custom repo name
             if (defined($rec{NAME})) {
-                $rec{GIT_REPO} = $rec{NAME};
+                $git_repo = $rec{NAME};
             } else {
-                my $git_repo = $rec{"URL"};
+                $git_repo = $rec{"URL"};
                 $git_repo =~ s/\.git$//;
                 $git_repo =~ s/^.*[:\/]//;
-                $rec{"GIT_REPO"} = $git_repo;
             }
+            $rec{"GIT_REPO"} = $git_repo;
+            
             # add the repo to %updated_git_repos and set it to 0
             # we will use this to track which repos have already been cloned
             # or updated
@@ -549,15 +551,17 @@ sub parse_list {
 
         # parse name of darcs repo
         if ( $rec{"TYPE"} eq "darcs" ) {
+            my $darcs_repo;
             # check for custom repo name
             if (defined($rec{NAME})) {
-                $rec{DARCS_REPO} = $rec{NAME};
+                $darcs_repo = $rec{NAME};
             } else {
-                my $darcs_repo = $rec{"URL"};
+                $darcs_repo = $rec{"URL"};
                 $darcs_repo =~ s/_darcs$//;
                 $darcs_repo =~ s/^.*[:\/]//;
-                $rec{"DARCS_REPO"} = $darcs_repo;
             }
+            $rec{"DARCS_REPO"} = $darcs_repo;
+            
             # add the repo to %updated_darcs_repos and set it to 0
             # we will use this to track which repos have already been cloned
             # or updated
@@ -569,15 +573,17 @@ sub parse_list {
 
         # parse name of mercurial repo
         if ( $rec{"TYPE"} eq "hg" ) {
+            my $hg_repo;
             # check for custom repo name
             if (defined($rec{NAME})) {
-                $rec{HG_REPO} = $rec{NAME};
+                $hg_repo = $rec{NAME};
             } else {
-                my $hg_repo = $rec{"URL"};
+                $hg_repo = $rec{"URL"};
                 $hg_repo =~ s/\.hg$//;
                 $hg_repo =~ s/^.*[:\/]//;
-                $rec{"HG_REPO"} = $hg_repo;
             }
+            $rec{"HG_REPO"} = $hg_repo;
+            
             # add the repo to %updated_hg_repos and set it to 0
             # we will use this to track which repos have already been cloned
             # or updated
