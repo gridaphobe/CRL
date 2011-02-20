@@ -370,11 +370,21 @@ sub parse_list {
     $file =~ s/!REPOSITORY_BRANCH/!REPO_BRANCH/gm;
     $file =~ s/!AUTHORIZATION_URL/!AUTH_URL/gm;
 
-    # replace definitions
-    $file =~ s/\$(\w+)/
+    # replace definitions, except if escaped
+    $file =~ s/(?<!\\)\$(\w+)/
                         exists $DEFINITIONS{$1} ? $DEFINITIONS{$1} : '$'.$1
                         /egm;
-
+    if ($file =~ /\\\$(\w+)/) {
+        # make sure that escaped definitions are environment variables
+        for my $match ($+) {
+            #print "$match\n";
+            unless (grep $_ eq $match,  keys %ENV) {
+                DIE("No definition for $match found in input file or ENV.");
+            }
+        }
+        # now replace escaped defs with env variables
+        $file =~ s/\\\$(\w+)/$ENV{$1}/g;
+    }
     # if $ROOT is undefined, it will be set to the current directory
     if   ( defined( $DEFINITIONS{ROOT} ) ) { $ROOT = $DEFINITIONS{ROOT} }
     else                                   { $ROOT = $orig_dir }
@@ -1138,7 +1148,7 @@ sub handle_svn {
 
         run_command("mkdir -p $target");
         my $dir = defined($name) ? $name : $checkout;
-        $cmd = "$svn checkout$user$date $url $orig_dir/$target/$dir";
+        $cmd = "cd $target && $svn checkout$user$date $url $dir";
 
         print_checkout_info( $checkout, $url, $target, $name );
 
@@ -1158,7 +1168,7 @@ sub handle_svn {
     elsif ( $method eq 'update' ) {
 
         my $dir = defined($name) ? $name : $checkout;
-        $cmd = "$svn update --non-interactive $date $orig_dir/$target/$dir";
+        $cmd = "cd $target/$dir && $svn update --non-interactive $date";
 
         print_update_info( $checkout, $url, $target, $name );
         ( $err, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
@@ -1266,7 +1276,7 @@ sub handle_git {
 
         # clone the git repo
         elsif ( !-e $repo_loc ) {
-            $cmd = "$git clone$shallow $url $orig_dir/$ROOT/repos/$git_repo";
+            $cmd = "$git clone$shallow $url $repo_loc";
             my ( $err, $out ) = run_command($cmd);
             if ($err) {
                 my $log = "Could not checkout module $checkout\n";
@@ -1359,12 +1369,16 @@ sub handle_git {
         }
 
         my $target_dir = "$orig_dir/$target/$checkout_dir";
+        # $target could be absolute path already...
+        if ($target =~ m!^/!) {
+            $target_dir = "$target/$checkout_dir"
+        }
         run_command("mkdir -p $target_dir");
 
         # get relative path from target directory to directory containing the
         # repositories
         $git_repos_dir = File::Spec->abs2rel( "$orig_dir/$ROOT/repos",
-            "$orig_dir/$target/$checkout_dir" );
+            "$target_dir" );
 
         # now we create a symlink from the repo to the appropriate target
         if ( defined($repo_path) ) {
@@ -1818,8 +1832,7 @@ sub handle_darcs {
 
         # clone the darcs repo
         elsif ( !-e $repo_loc ) {
-            $cmd = "$darcs get$shallow$tag $url"
-              . " $orig_dir/$ROOT/repos/$darcs_repo";
+            $cmd = "$darcs get$shallow$tag $url $repo_loc";
             print_checkout_info( $checkout, $url, $target, $name );
             my ( $err, $out ) = run_command($cmd);
             if ($err) {
@@ -1865,12 +1878,16 @@ sub handle_darcs {
         }
 
         my $target_dir = "$orig_dir/$target/$checkout_dir";
+        # $target could be absolute path
+        if ($target =~ m!^/!) {
+            $target_dir = "$target/$checkout_dir"
+        }
         run_command("mkdir -p $target_dir");
 
         # get relative path from target directory to directory containing the
         # repositories
         $darcs_repos_dir = File::Spec->abs2rel( "$orig_dir/$ROOT/repos",
-            "$orig_dir/$target/$checkout_dir" );
+            "$target_dir" );
 
         # now we create a symlink from the repo to the appropriate target
         if ( defined($repo_path) ) {
@@ -2240,12 +2257,16 @@ sub handle_hg {
         }
 
         my $target_dir = "$orig_dir/$target/$checkout_dir";
+        # $target could be absolute path
+        if ($target =~ m!^/!) {
+            $target_dir = "$target/$checkout_dir"
+        }
         run_command("mkdir -p $target_dir");
 
         # get relative path from target directory to directory containing the
         # repositories
         $hg_repos_dir = File::Spec->abs2rel( "$orig_dir/$ROOT/repos",
-            "$orig_dir/$target/$checkout_dir" );
+            "$target_dir" );
 
         # now we create a symlink from the repo to the appropriate target
         if ( defined($repo_path) ) {
