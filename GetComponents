@@ -539,72 +539,6 @@ sub parse_list {
             }
         }
 
-        # parse name of git repo
-        if ( $rec{"TYPE"} eq "git" ) {
-            my $git_repo;
-            # check for custom repo name
-            if (defined($rec{NAME})) {
-                $git_repo = $rec{NAME};
-            } else {
-                $git_repo = $rec{"URL"};
-                $git_repo =~ s/\.git$//;
-                $git_repo =~ s/^.*[:\/]//;
-            }
-            $rec{"GIT_REPO"} = $git_repo;
-            
-            # add the repo to %updated_git_repos and set it to 0
-            # we will use this to track which repos have already been cloned
-            # or updated
-            $updated_git_repos{$git_repo} = 0;
-            if ($PARALLEL) {
-                $semaphores{$git_repo} = Thread::Semaphore->new();
-            }
-        }
-
-        # parse name of darcs repo
-        if ( $rec{"TYPE"} eq "darcs" ) {
-            my $darcs_repo;
-            # check for custom repo name
-            if (defined($rec{NAME})) {
-                $darcs_repo = $rec{NAME};
-            } else {
-                $darcs_repo = $rec{"URL"};
-                $darcs_repo =~ s/_darcs$//;
-                $darcs_repo =~ s/^.*[:\/]//;
-            }
-            $rec{"DARCS_REPO"} = $darcs_repo;
-            
-            # add the repo to %updated_darcs_repos and set it to 0
-            # we will use this to track which repos have already been cloned
-            # or updated
-            $updated_darcs_repos{$darcs_repo} = 0;
-            if ($PARALLEL) {
-                $semaphores{$darcs_repo} = Thread::Semaphore->new();
-            }
-        }
-
-        # parse name of mercurial repo
-        if ( $rec{"TYPE"} eq "hg" ) {
-            my $hg_repo;
-            # check for custom repo name
-            if (defined($rec{NAME})) {
-                $hg_repo = $rec{NAME};
-            } else {
-                $hg_repo = $rec{"URL"};
-                $hg_repo =~ s/\.hg$//;
-                $hg_repo =~ s/^.*[:\/]//;
-            }
-            $rec{"HG_REPO"} = $hg_repo;
-            
-            # add the repo to %updated_hg_repos and set it to 0
-            # we will use this to track which repos have already been cloned
-            # or updated
-            $updated_hg_repos{$hg_repo} = 0;
-            if ($PARALLEL) {
-                $semaphores{$hg_repo} = Thread::Semaphore->new();
-            }
-        }
-
         # save target in original form to check existence.
         my $target = $rec{"TARGET"};
 
@@ -642,6 +576,84 @@ sub parse_list {
                 $rec{AUTH_URL} = $rec{"AUTH_URL_ORIG"};
                 $rec{AUTH_URL} =~ s!\$1!$dir1!;
                 $rec{AUTH_URL} =~ s!\$2!$dir2!;
+            }  
+
+            # parse name of git repo
+            if ( $rec{"TYPE"} eq "git" ) {
+                my $git_repo;
+                # check for custom repo name
+                if (defined($rec{NAME})) {
+                    $git_repo = $rec{NAME};
+                } else {
+                    $git_repo = $rec{"URL"};
+                    $git_repo =~ s/\.git$//;
+                    $git_repo =~ s/^.*[:\/]//;
+                }
+                $rec{"GIT_REPO"} = $git_repo;
+                $rec{"GIT_REPO"} =~ s!\$1!$dir1!;
+                $rec{"GIT_REPO"} =~ s!\$2!$dir2!;
+                
+                # add the repo to %updated_git_repos and set it to 0
+                # we will use this to track which repos have already been cloned
+                # or updated
+                if (not exists $updated_git_repos{$git_repo}) {
+                    $updated_git_repos{$git_repo} = 0;
+                }
+                if ($PARALLEL and not exists $semaphores{$git_repo}) {
+                    $semaphores{$git_repo} = Thread::Semaphore->new();
+                }
+            }
+    
+            # parse name of darcs repo
+            if ( $rec{"TYPE"} eq "darcs" ) {
+                my $darcs_repo;
+                # check for custom repo name
+                if (defined($rec{NAME})) {
+                    $darcs_repo = $rec{NAME};
+                } else {
+                    $darcs_repo = $rec{"URL"};
+                    $darcs_repo =~ s/_darcs$//;
+                    $darcs_repo =~ s/^.*[:\/]//;
+                }
+                $rec{"DARCS_REPO"} = $darcs_repo;
+                $rec{"DARCS_REPO"} =~ s!\$1!$dir1!;
+                $rec{"DARCS_REPO"} =~ s!\$2!$dir2!;
+                
+                # add the repo to %updated_darcs_repos and set it to 0
+                # we will use this to track which repos have already been cloned
+                # or updated
+                if (not exists $updated_darcs_repos{$darcs_repo}) {
+                    $updated_darcs_repos{$darcs_repo} = 0;
+                }
+                if ($PARALLEL and not exists $semaphores{$darcs_repo}) {
+                    $semaphores{$darcs_repo} = Thread::Semaphore->new();
+                }
+            }
+    
+            # parse name of mercurial repo
+            if ( $rec{"TYPE"} eq "hg" ) {
+                my $hg_repo;
+                # check for custom repo name
+                if (defined($rec{NAME})) {
+                    $hg_repo = $rec{NAME};
+                } else {
+                    $hg_repo = $rec{"URL"};
+                    $hg_repo =~ s/\.hg$//;
+                    $hg_repo =~ s/^.*[:\/]//;
+                }
+                $rec{"HG_REPO"} = $hg_repo;
+                $rec{"HG_REPO"} =~ s!\$1!$dir1!;
+                $rec{"HG_REPO"} =~ s!\$2!$dir2!;
+                
+                # add the repo to %updated_hg_repos and set it to 0
+                # we will use this to track which repos have already been cloned
+                # or updated
+                if (not exists $updated_hg_repos{$hg_repo}) {
+                    $updated_hg_repos{$hg_repo} = 0;
+                }
+                if ($PARALLEL and not exists $semaphores{$hg_repo}) {
+                    $semaphores{$hg_repo} = Thread::Semaphore->new();
+                }
             }
 
             $rec{"CHECKOUT"} = $checkout;
