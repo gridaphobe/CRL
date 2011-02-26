@@ -13,9 +13,10 @@ Usage
 -----
     ./GetComponents [options] [file|URL]
 
-GetComponents will accept a CRL file specified locally or remotely, in which case
-it will download the remote file. It can checkout and update components (also from a
-specific date), show the status of all components, and do a diff on all components.
+GetComponents will accept a CRL file specified locally or remotely, in which
+case it will download the remote file. It can checkout and update components
+(also from a specific date), show the status of all components, and do a diff
+on all components.
 
 For a full overview of the options and the CRL syntax look at the [wiki][]
 or look at the built-in documentation with
