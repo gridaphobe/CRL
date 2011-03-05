@@ -187,24 +187,17 @@ exit( @components_error > 0 );
 ##########################################################################
 
 sub process_args() {
-    unless ( @ARGV || ( -e "$crl_dir/component_lists" ) ) {
-        pod2usage( "\n$0: No files given.\nSpecify -man "
+    unless ( @ARGV || ( -e ".crl/component_list.crl" ) ) {
+        pod2usage( "\n$0: No files given.\nSpecify --man "
               . "for an explanation of how to use this script.\n\n" );
     }
 
-    # not using this option currently
     if ( @ARGV == 0 ) {
-        my $list_dir = "$crl_dir/component_lists";
-        opendir( DIR, $list_dir ) || DIE("Can't open $list_dir");
-        my @files = grep { ( !/^\./ ) && -f "$list_dir/$_" } readdir(DIR);
-        closedir DIR;
-        print "The following component lists were found:\n";
-        for my $file (@files) {
-            print "$file\n";
-        }
-        print "Would you like to update these? [(y)es no] ";
-        my $answer = <STDIN>;
-        exit;
+        my $list = ".crl/component_list.crl";
+        push @ORIG_LISTS, $list;
+        push @CRL_LISTS, $list;
+        # set $ROOT so it isn't overwritten by definition in file
+        $ROOT = '.';
     }
     else {
         foreach my $ARG (@ARGV) {
@@ -792,15 +785,27 @@ sub write_componentlist_target {
     # find directory to put file into
     my $fn = $ROOT;
     if ( defined( $DEFINITIONS{"COMPONENTLIST_TARGET"} ) ) {
+        # this means the user specified a location for the list
         $fn = $DEFINITIONS{"COMPONENTLIST_TARGET"};
         run_command("mkdir -p '$fn'");
+
+        # find file name
+        my $short_name = $CRL_LISTS[0];
+        $short_name =~ s/.*\///g;
+        $fn .= "/$short_name";
+
+        # write file
+        open( ALL, ">$fn" ) or die("Could not write file $fn");
+        print ALL $combined_components;
+        close(ALL);
     }
 
-    # find file name
-    my $short_name = $CRL_LISTS[0];
-    $short_name =~ s/.*\///g;
-    $fn .= "/$short_name";
-
+    # we'll also store it in the default location
+    $fn = "$ROOT/.crl/component_list.crl";
+    # perl can't create dirs for a file
+    unless (-e "$ROOT/.crl") {
+        mkdir "$ROOT/.crl";
+    }
     # write file
     open( ALL, ">$fn" ) or die("Could not write file $fn");
     print ALL $combined_components;
