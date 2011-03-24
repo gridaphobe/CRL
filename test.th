@@ -21,10 +21,10 @@
 # Test git repo
 !TARGET		= $ROOT/git
 !TYPE		= git
-!URL		= git://github.com/gridaphobe/CRL.git
-!REPO_BRANCH = stable, ET_2010_11
+!URL		= https://github.com/gridaphobe/CRL.git
+!REPO_BRANCH = stable, ET_2010_11, master
 !CHECKOUT	= GetComponents
-!NAME = GetComponents
+#!NAME = GetComponents
 
 # Test hg repo
 !TARGET		= $ROOT/hg
