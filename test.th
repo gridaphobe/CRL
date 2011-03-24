@@ -21,12 +21,9 @@
 # Test git repo
 !TARGET		= $ROOT/git
 !TYPE		= git
-!URL		= git://github.com/gridaphobe/$1
-#!REPO_BRANCH = stable, ET_2010_11
-!REPO_PATH = ../$1
-!CHECKOUT	= 
-CRL
-eseidel.org
+!URL		= https://github.com/gridaphobe/CRL.git
+!REPO_BRANCH = stable, ET_2010_11, master
+!CHECKOUT	= GetComponents
 #!NAME = GetComponents
 
 # Test hg repo
