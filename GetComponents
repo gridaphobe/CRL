@@ -1313,10 +1313,6 @@ sub handle_git {
                     if ( defined $branch ) {
                         $cmd = "cd $repo_loc && "
                           . "$git checkout --track -b $branch origin/$branch";
-                        if ( $branch eq 'master' ) {
-                            # fix for master branch
-                            $cmd = "cd $repo_loc && $git checkout master";
-                        }
                         my ( $err, $out ) = run_command($cmd);
                         if ($err) {
                             my $new;

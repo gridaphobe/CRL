@@ -40,7 +40,6 @@ MEGA_VERBOSE = 2
 
 BASE_DIR = os.getcwd()
 
-
 def main():
     Options.Build()
     c = ComponentList()
@@ -70,13 +69,13 @@ class Options(object):
         usage = "usage: %prog [options] component_list"
         parser = OptionParser(usage=usage)
         parser.add_option("-v", "--verbose", action="count", dest="verbose",
-                default=0, help="print everything!")
+                            default=0, help="print everything!")
         parser.add_option("-a", "--anonymous", action="store_true",
-                dest="anonymous", default=False,
-                help="use anonymous checkout/update methods")
+                            dest="anonymous", default=False,
+                            help="use anonymous checkout/update methods")
         parser.add_option("-u", "--update", action="store_true",
-                dest="update", default=False,
-                help="update all existing components")
+                            dest="update", default=False,
+                            help="update all existing components")
         options, args = parser.parse_args()
         Options.verbose = options.verbose
         Options.anonymous = options.anonymous
@@ -454,7 +453,7 @@ class svnComponent(Component):
 
     def checkout(self):
         cmd = "%s checkout %s %s %s %s" % (SVN, self.USER, self.DATE, self.URL,
-                os.path.join(BASE_DIR, self.TARGET, self.DIR))
+                            os.path.join(BASE_DIR, self.TARGET, self.DIR))
         print_checkout_info(self.CHECKOUT, self.URL, self.TARGET, self.NAME)
         if run_command(cmd):
             return True
@@ -463,7 +462,7 @@ class svnComponent(Component):
 
     def update(self):
         cmd = "%s update %s" % (SVN, os.path.join(
-            BASE_DIR, self.TARGET, self.DIR))
+                                BASE_DIR, self.TARGET, self.DIR))
         print_update_info(self.CHECKOUT, self.URL, self.TARGET, self.NAME)
         if run_command(cmd):
             return True
