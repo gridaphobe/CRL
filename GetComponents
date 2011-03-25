@@ -367,7 +367,7 @@ sub parse_list {
     $file =~ s/(?<!\\)\$(\w+)/
                         exists $DEFINITIONS{$1} ? $DEFINITIONS{$1} : '$'.$1
                         /egm;
-    if ($file =~ /\\\$(\w+)/) {
+    if ($file =~ /(?<!\\)\$([A-Za-z]\w*)/) {
         # make sure that escaped definitions are environment variables
         for my $match ($+) {
             #print "$match\n";
@@ -376,7 +376,7 @@ sub parse_list {
             }
         }
         # now replace escaped defs with env variables
-        $file =~ s/\\\$(\w+)/$ENV{$1}/g;
+        $file =~ s/(?<!\\)\$([A-Za-z]\w*)/$ENV{$1}/g;
     }
     # if $ROOT is undefined, it will be set to the current directory
     if   ( defined( $DEFINITIONS{ROOT} ) ) { $ROOT = $DEFINITIONS{ROOT} }
