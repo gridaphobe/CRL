@@ -70,6 +70,7 @@ my @all_components;
 my $checkout_size : shared = 0;
 my $update_size : shared   = 0;
 my @components_error : shared;
+my @warnings : shared;
 my %svn_servers : shared;
 my $ROOT               = '';
 my $VERBOSE            = 0;
@@ -1056,7 +1057,7 @@ sub handle_cvs {
         my ( $err, $out ) = run_command($cmd);
         if ( $err != 0 || $out =~ /^cvs:/gmi ) {
             my $log = "Could not check out module $checkout\n";
-            $out =~ s'^(?!\S*:\s).*$''gmi;
+            #$out =~ s'^(?!\S*:\s).*$''gmi;
             $log .= $out;
             WARN($log);
             push( @components_error, $checkout );
@@ -1073,7 +1074,7 @@ sub handle_cvs {
         my ( $err, $out ) = run_command($cmd);
         if ( $err != 0 || $out =~ /^cvs:/gmi ) {
             my $log = "Could not update module $checkout\n";
-            $out =~ s'^(?!\S*:\s).*$''gmi;
+            #$out =~ s'^(?!\S*:\s).*$''gmi;
             $log .= $out;
             WARN($log);
             push( @components_error, $checkout );
@@ -1175,6 +1176,7 @@ sub handle_svn {
         if ( $err || $out =~ /^svn/gmi ) {
             my $log = "Could not checkout module $checkout\n";
             $out =~ s/^(?!svn).*$//gmi;
+            $out =~ s/\n+/\n/g;
             $log .= $out;
             WARN($log);
             push( @components_error, $checkout );
@@ -1192,6 +1194,7 @@ sub handle_svn {
         if ( $err || $out =~ /^svn/gmi ) {
             my $log = "Could not update module $checkout\n";
             $out =~ s/^(?!svn).*$//gmi;
+            $out =~ s/\n+/\n/g;
             $log .= $out;
             WARN($log);
             push( @components_error, $checkout );
@@ -1298,6 +1301,7 @@ sub handle_git {
             if ($err) {
                 my $log = "Could not checkout module $checkout\n";
                 $out =~ s/^(?!fatal).*$//gmi;
+                $out =~ s/\n+/\n/g;
                 $log .= $out;
                 WARN($log);
                 push( @components_error, $checkout );
@@ -1859,6 +1863,7 @@ sub handle_darcs {
             if ($err) {
                 my $log = "Could not checkout module $checkout\n";
                 $out =~ s/^(?!darcs).*$//gmi;
+                $out =~ s/\n+/\n/g;
                 $log .= $out;
                 WARN($log);
                 push( @components_error, $checkout );
@@ -1876,6 +1881,7 @@ sub handle_darcs {
             if ($err) {
                 my $log = "Could not checkout module $checkout\n";
                 $out =~ s/^(?!darcs).*$//gmi;
+                $out =~ s/\n+/\n/g;
                 $log .= $out;
                 WARN($log);
                 push( @components_error, $checkout );
@@ -1992,6 +1998,7 @@ sub handle_darcs {
             if ($err) {
                 my $log = "Could not update module $checkout\n";
                 $out =~ s/^(?!darcs).*$//gmi;
+                $out =~ s/\n+/\n/g;
                 $log .= $out;
                 WARN($log);
                 push( @components_error, $checkout );
@@ -2187,6 +2194,7 @@ sub handle_hg {
             if ($err) {
                 my $log = "Could not checkout module $checkout\n";
                 $out =~ s/^(?!abort).*$//gmi;
+                $out =~ s/\n+/\n/g;
                 $log .= $out;
                 WARN($log);
                 push( @components_error, $checkout );
@@ -2255,6 +2263,7 @@ sub handle_hg {
             if ($err) {
                 my $log = "Could not checkout module $checkout\n";
                 $out =~ s/^(?!abort).*$//gmi;
+                $out =~ s/\n+/\n/g;
                 $log .= $out;
                 WARN($log);
                 push( @components_error, $checkout );
@@ -2370,6 +2379,7 @@ sub handle_hg {
             if ($err) {
                 my $log = "Could not update module $checkout\n";
                 $out =~ s/^(?!abort).*$//gmi;
+                $out =~ s/\n+/\n/g;
                 $log .= $out;
                 WARN($log);
                 push( @components_error, $checkout );
@@ -2443,18 +2453,18 @@ sub run_command {
     my $VERBOSE_OVERRIDE = shift;
     my $show_err         = shift;
     my $verbose = defined $VERBOSE_OVERRIDE ? $VERBOSE_OVERRIDE : $VERBOSE;
-    my $err = defined $show_err ? '' : ' 2>&1';
+    my $err = $show_err ? '' : '2>&1';
     if ( $command =~ /^$/ ) { return }
     if ($verbose) {
 
         if ( $command =~ /^cd (.*) \&\& (.*)$/ ) {
             my ( $cmd, $loc ) = ( $2, $1 );
             print BOLD, "Executing: ", RESET, "$cmd\n",
-              BOLD, "       In: ", RESET, "$loc\n";
+                  BOLD, "       In: ", RESET, "$loc\n";
         }
         else { print BOLD, "Executing: ", RESET, "$command\n" }
     }
-    my $out = `$command$err`;
+    my $out = `$command $err`;
     my $ret = $?;
     print $out if $verbose;
     return ( $ret, $out );
@@ -2518,6 +2528,10 @@ sub print_summary {
           . " errors occurred during update from thornlist(s): ";
         $logmsg .= join( ' , ', @ORIG_LISTS );
         &LOG($logmsg);
+        print "Summary of Warnings:\n\n";
+        foreach my $warning (@warnings) {
+            print "$warning\n";
+        }
     }
 
     my $elapsed_time = time - $start_time;
@@ -2572,6 +2586,7 @@ sub LOG {
 sub WARN {
     my $warning = shift;
     LOG($warning);
+    push( @warnings, $warning );
     warn( "\n", BOLD, RED, "Warning: ", RESET, "$warning\n\n" );
 }
 
