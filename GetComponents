@@ -187,24 +187,17 @@ exit( @components_error > 0 );
 ##########################################################################
 
 sub process_args() {
-    unless ( @ARGV || ( -e "$crl_dir/component_lists" ) ) {
-        pod2usage( "\n$0: No files given.\nSpecify -man "
+    unless ( @ARGV || ( -e ".crl/component_list.crl" ) ) {
+        pod2usage( "\n$0: No files given.\nSpecify --man "
               . "for an explanation of how to use this script.\n\n" );
     }
 
-    # not using this option currently
     if ( @ARGV == 0 ) {
-        my $list_dir = "$crl_dir/component_lists";
-        opendir( DIR, $list_dir ) || DIE("Can't open $list_dir");
-        my @files = grep { ( !/^\./ ) && -f "$list_dir/$_" } readdir(DIR);
-        closedir DIR;
-        print "The following component lists were found:\n";
-        for my $file (@files) {
-            print "$file\n";
-        }
-        print "Would you like to update these? [(y)es no] ";
-        my $answer = <STDIN>;
-        exit;
+        my $list = ".crl/component_list.crl";
+        push @ORIG_LISTS, $list;
+        push @CRL_LISTS, $list;
+        # set $ROOT so it isn't overwritten by definition in file
+        $ROOT = '.';
     }
     else {
         foreach my $ARG (@ARGV) {
@@ -232,16 +225,16 @@ sub download_list {
 }
 
 sub find_tools {
-    if ( system("which $cvs >/dev/null") == 0 ) { $cvs_found = 1 }
-    if ( system("which $svn >/dev/null") == 0 ) { $svn_found = 1 }
-    if ( system("which $git >/dev/null") == 0 ) { $git_found = 1 }
-    if ( system("which $curl >/dev/null") == 0 ) {
+    if ( system("which $cvs >/dev/null 2>&1") == 0 ) { $cvs_found = 1 }
+    if ( system("which $svn >/dev/null 2>&1") == 0 ) { $svn_found = 1 }
+    if ( system("which $git >/dev/null 2>&1") == 0 ) { $git_found = 1 }
+    if ( system("which $curl >/dev/null 2>&1") == 0 ) {
         $curl_found = 1;
         $curl .= " -f";
     }
-    elsif ( system("which $wget >/dev/null") == 0 )  { $wget_found  = 1 }
-    if    ( system("which $darcs >/dev/null") == 0 ) { $darcs_found = 1 }
-    if    ( system("which $hg >/dev/null") == 0 )    { $hg_found    = 1 }
+    elsif ( system("which $wget >/dev/null 2>&1") == 0 )  { $wget_found  = 1 }
+    if    ( system("which $darcs >/dev/null 2>&1") == 0 ) { $darcs_found = 1 }
+    if    ( system("which $hg >/dev/null 2>&1") == 0 )    { $hg_found    = 1 }
     if    ($cvs_found) {
 
         # Use compression to speed up slow links, and to avoid
@@ -319,7 +312,9 @@ sub parse_list {
         }
 
         # grab definitions
+        my $line_nr = 0;
         foreach my $line (@lines) {
+            $line_nr++;
             if ( $line =~ /^!DEFINE\s*([^\s]+)\s*=\s*(.+)/ ) {
                 my ( $def, $value ) = ( $1, $2 );
 
@@ -331,10 +326,10 @@ sub parse_list {
                     and $DEFINITIONS{$def} ne $value )
                 {
                     if ($EXPERIMENTAL) {
-                        WARN("Repeated definition of $def, ignored");
+                        WARN("Repeated definition of $def on line $line_nr, ignored");
                     }
                     else {
-                        DIE("Repeated definition of $def");
+                        DIE("Repeated definition of $def on line $line_nr");
                     }
                 }
                 else {
@@ -368,11 +363,21 @@ sub parse_list {
     $file =~ s/!REPOSITORY_BRANCH/!REPO_BRANCH/gm;
     $file =~ s/!AUTHORIZATION_URL/!AUTH_URL/gm;
 
-    # replace definitions
-    $file =~ s/\$(\w+)/
+    # replace definitions, except if escaped
+    $file =~ s/(?<!\\)\$(\w+)/
                         exists $DEFINITIONS{$1} ? $DEFINITIONS{$1} : '$'.$1
                         /egm;
-
+    if ($file =~ /(?<!\\)\$([A-Za-z]\w*)/) {
+        # make sure that escaped definitions are environment variables
+        for my $match ($+) {
+            #print "$match\n";
+            unless (grep $_ eq $match,  keys %ENV) {
+                DIE("No definition for $match found in input file or ENV.");
+            }
+        }
+        # now replace escaped defs with env variables
+        $file =~ s/(?<!\\)\$([A-Za-z]\w*)/$ENV{$1}/g;
+    }
     # if $ROOT is undefined, it will be set to the current directory
     if   ( defined( $DEFINITIONS{ROOT} ) ) { $ROOT = $DEFINITIONS{ROOT} }
     else                                   { $ROOT = $orig_dir }
@@ -420,7 +425,7 @@ sub parse_list {
             chomp $cvs;
 
             # verify that we actually have cvs now...
-            my $ret = system "$cvs --version >/dev/null";
+            my $ret = system "$cvs --version >/dev/null 2>&1";
             if ($ret) {
                 DIE("$cvs does not appear to be a working copy of cvs!");
             }
@@ -434,7 +439,7 @@ sub parse_list {
             chomp $svn;
 
             # verify that we actually have svn now...
-            my $ret = system "$svn --version >/dev/null";
+            my $ret = system "$svn --version >/dev/null 2>&1";
             if ($ret) {
                 DIE("$svn does not appear to be a working copy of svn!");
             }
@@ -448,7 +453,7 @@ sub parse_list {
             chomp $git;
 
             # verify that we actually have git now...
-            my $ret = system "$git --version >/dev/null";
+            my $ret = system "$git --version >/dev/null 2>&1";
             if ($ret) {
                 DIE("$git does not appear to be a working copy of git!");
             }
@@ -466,7 +471,7 @@ sub parse_list {
                 $curl = $path;
 
                 # verify that we actually have curl now...
-                my $ret = system "$curl --version >/dev/null";
+                my $ret = system "$curl --version >/dev/null 2>&1";
                 if ($ret) {
                     DIE("$curl does not appear to be a working copy of curl!");
                 }
@@ -476,7 +481,7 @@ sub parse_list {
                 $wget = $path;
 
                 # verify that we actually have wget now...
-                my $ret = system "$wget --version >/dev/null";
+                my $ret = system "$wget --version >/dev/null 2>&1";
                 if ($ret) {
                     DIE("$wget does not appear to be a working copy of wget!");
                 }
@@ -491,7 +496,7 @@ sub parse_list {
             chomp $darcs;
 
             # verify that we actually have darcs now...
-            my $ret = system "$darcs --version >/dev/null";
+            my $ret = system "$darcs --version >/dev/null 2>&1";
             if ($ret) {
                 DIE("$darcs does not appear to be a working copy of darcs!");
             }
@@ -505,7 +510,7 @@ sub parse_list {
             chomp $hg;
 
             # verify that we actually have hg now...
-            my $ret = system "$hg --version >/dev/null";
+            my $ret = system "$hg --version >/dev/null 2>&1";
             if ($ret) {
                 DIE("$hg does not appear to be a working copy of hg!");
             }
@@ -524,54 +529,6 @@ sub parse_list {
                 else {
                     $svn_servers{$base} = 1;
                 }
-            }
-        }
-
-        # parse name of git repo
-        if ( $rec{"TYPE"} eq "git" ) {
-            my $git_repo = $rec{"URL"};
-            $git_repo =~ s/\.git$//;
-            $git_repo =~ s/^.*[:\/]//;
-            $rec{"GIT_REPO"} = $git_repo;
-
-            # add the repo to %updated_git_repos and set it to 0
-            # we will use this to track which repos have already been cloned
-            # or updated
-            $updated_git_repos{$git_repo} = 0;
-            if ($PARALLEL) {
-                $semaphores{$git_repo} = Thread::Semaphore->new();
-            }
-        }
-
-        # parse name of darcs repo
-        if ( $rec{"TYPE"} eq "darcs" ) {
-            my $darcs_repo = $rec{"URL"};
-            $darcs_repo =~ s/_darcs$//;
-            $darcs_repo =~ s/^.*[:\/]//;
-            $rec{"DARCS_REPO"} = $darcs_repo;
-
-            # add the repo to %updated_darcs_repos and set it to 0
-            # we will use this to track which repos have already been cloned
-            # or updated
-            $updated_darcs_repos{$darcs_repo} = 0;
-            if ($PARALLEL) {
-                $semaphores{$darcs_repo} = Thread::Semaphore->new();
-            }
-        }
-
-        # parse name of mercurial repo
-        if ( $rec{"TYPE"} eq "hg" ) {
-            my $hg_repo = $rec{"URL"};
-            $hg_repo =~ s/\.hg$//;
-            $hg_repo =~ s/^.*[:\/]//;
-            $rec{"HG_REPO"} = $hg_repo;
-
-            # add the repo to %updated_hg_repos and set it to 0
-            # we will use this to track which repos have already been cloned
-            # or updated
-            $updated_hg_repos{$hg_repo} = 0;
-            if ($PARALLEL) {
-                $semaphores{$hg_repo} = Thread::Semaphore->new();
             }
         }
 
@@ -612,6 +569,84 @@ sub parse_list {
                 $rec{AUTH_URL} = $rec{"AUTH_URL_ORIG"};
                 $rec{AUTH_URL} =~ s!\$1!$dir1!;
                 $rec{AUTH_URL} =~ s!\$2!$dir2!;
+            }  
+
+            # parse name of git repo
+            if ( $rec{"TYPE"} eq "git" ) {
+                my $git_repo;
+                # check for custom repo name
+                if (defined($rec{NAME})) {
+                    $git_repo = $rec{NAME};
+                } else {
+                    $git_repo = $rec{"URL"};
+                    $git_repo =~ s/\.git$//;
+                    $git_repo =~ s/^.*[:\/]//;
+                }
+                $rec{"GIT_REPO"} = $git_repo;
+                $rec{"GIT_REPO"} =~ s!\$1!$dir1!;
+                $rec{"GIT_REPO"} =~ s!\$2!$dir2!;
+                
+                # add the repo to %updated_git_repos and set it to 0
+                # we will use this to track which repos have already been cloned
+                # or updated
+                if (not exists $updated_git_repos{$git_repo}) {
+                    $updated_git_repos{$git_repo} = 0;
+                }
+                if ($PARALLEL and not exists $semaphores{$git_repo}) {
+                    $semaphores{$git_repo} = Thread::Semaphore->new();
+                }
+            }
+    
+            # parse name of darcs repo
+            if ( $rec{"TYPE"} eq "darcs" ) {
+                my $darcs_repo;
+                # check for custom repo name
+                if (defined($rec{NAME})) {
+                    $darcs_repo = $rec{NAME};
+                } else {
+                    $darcs_repo = $rec{"URL"};
+                    $darcs_repo =~ s/_darcs$//;
+                    $darcs_repo =~ s/^.*[:\/]//;
+                }
+                $rec{"DARCS_REPO"} = $darcs_repo;
+                $rec{"DARCS_REPO"} =~ s!\$1!$dir1!;
+                $rec{"DARCS_REPO"} =~ s!\$2!$dir2!;
+                
+                # add the repo to %updated_darcs_repos and set it to 0
+                # we will use this to track which repos have already been cloned
+                # or updated
+                if (not exists $updated_darcs_repos{$darcs_repo}) {
+                    $updated_darcs_repos{$darcs_repo} = 0;
+                }
+                if ($PARALLEL and not exists $semaphores{$darcs_repo}) {
+                    $semaphores{$darcs_repo} = Thread::Semaphore->new();
+                }
+            }
+    
+            # parse name of mercurial repo
+            if ( $rec{"TYPE"} eq "hg" ) {
+                my $hg_repo;
+                # check for custom repo name
+                if (defined($rec{NAME})) {
+                    $hg_repo = $rec{NAME};
+                } else {
+                    $hg_repo = $rec{"URL"};
+                    $hg_repo =~ s/\.hg$//;
+                    $hg_repo =~ s/^.*[:\/]//;
+                }
+                $rec{"HG_REPO"} = $hg_repo;
+                $rec{"HG_REPO"} =~ s!\$1!$dir1!;
+                $rec{"HG_REPO"} =~ s!\$2!$dir2!;
+                
+                # add the repo to %updated_hg_repos and set it to 0
+                # we will use this to track which repos have already been cloned
+                # or updated
+                if (not exists $updated_hg_repos{$hg_repo}) {
+                    $updated_hg_repos{$hg_repo} = 0;
+                }
+                if ($PARALLEL and not exists $semaphores{$hg_repo}) {
+                    $semaphores{$hg_repo} = Thread::Semaphore->new();
+                }
             }
 
             $rec{"CHECKOUT"} = $checkout;
@@ -635,17 +670,17 @@ sub parse_list {
             }
 
             # slightly different approach for git
-            elsif ( $component{"TYPE"} eq "git" && -e "$target/$dir" ) {
+            elsif ( $component{"TYPE"} eq "git" && -e "$target/$checkout" ) {
                 push @{ $components_to_update{$target} }, \%component;
             }
 
             # and for darcs
-            elsif ( $component{"TYPE"} eq "darcs" && -e "$target/$dir" ) {
+            elsif ( $component{"TYPE"} eq "darcs" && -e "$target/$checkout" ) {
                 push @{ $components_to_update{$target} }, \%component;
             }
 
             # and for hg
-            elsif ( $component{"TYPE"} eq "hg" && -e "$target/$dir" ) {
+            elsif ( $component{"TYPE"} eq "hg" && -e "$target/$checkout" ) {
                 push @{ $components_to_update{$target} }, \%component;
             }
             elsif ( $component{"TYPE"} eq "http" && -e "$target/$dir" ) {
@@ -750,15 +785,27 @@ sub write_componentlist_target {
     # find directory to put file into
     my $fn = $ROOT;
     if ( defined( $DEFINITIONS{"COMPONENTLIST_TARGET"} ) ) {
+        # this means the user specified a location for the list
         $fn = $DEFINITIONS{"COMPONENTLIST_TARGET"};
         run_command("mkdir -p '$fn'");
+
+        # find file name
+        my $short_name = $CRL_LISTS[0];
+        $short_name =~ s/.*\///g;
+        $fn .= "/$short_name";
+
+        # write file
+        open( ALL, ">$fn" ) or die("Could not write file $fn");
+        print ALL $combined_components;
+        close(ALL);
     }
 
-    # find file name
-    my $short_name = $CRL_LISTS[0];
-    $short_name =~ s/.*\///g;
-    $fn .= "/$short_name";
-
+    # we'll also store it in the default location
+    $fn = "$ROOT/.crl/component_list.crl";
+    # perl can't create dirs for a file
+    unless (-e "$ROOT/.crl") {
+        mkdir "$ROOT/.crl";
+    }
     # write file
     open( ALL, ">$fn" ) or die("Could not write file $fn");
     print ALL $combined_components;
@@ -1117,7 +1164,7 @@ sub handle_svn {
 
         run_command("mkdir -p $target");
         my $dir = defined($name) ? $name : $checkout;
-        $cmd = "$svn checkout$user$date $url $orig_dir/$target/$dir";
+        $cmd = "cd $target && $svn checkout$user$date $url $dir";
 
         print_checkout_info( $checkout, $url, $target, $name );
 
@@ -1137,7 +1184,7 @@ sub handle_svn {
     elsif ( $method eq 'update' ) {
 
         my $dir = defined($name) ? $name : $checkout;
-        $cmd = "$svn update --non-interactive $date $orig_dir/$target/$dir";
+        $cmd = "cd $target/$dir && $svn update --non-interactive $date";
 
         print_update_info( $checkout, $url, $target, $name );
         ( $err, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
@@ -1223,6 +1270,8 @@ sub handle_git {
     my $git_repo      = $component{"GIT_REPO"};
     my $cmd           = '';
     my $git_repos_dir = '';
+    my @branches = defined $component{REPO_BRANCH} ? 
+                    split ", ", $component{REPO_BRANCH} : ();
     my $branch;
     my $tag;
     my $repo_loc = "$orig_dir/$ROOT/repos/$git_repo";
@@ -1232,6 +1281,7 @@ sub handle_git {
         if ($PARALLEL) {
             $semaphores{$git_repo}->down();
         }
+        print_checkout_info( $checkout, $url, $target, $name );
 
         run_command("mkdir -p $orig_dir/$ROOT/repos");
 
@@ -1242,8 +1292,7 @@ sub handle_git {
 
         # clone the git repo
         elsif ( !-e $repo_loc ) {
-            $cmd = "$git clone$shallow $url $orig_dir/$ROOT/repos/$git_repo";
-            print_checkout_info( $checkout, $url, $target, $name );
+            $cmd = "$git clone$shallow $url $repo_loc";
             my ( $err, $out ) = run_command($cmd);
             if ($err) {
                 my $log = "Could not checkout module $checkout\n";
@@ -1256,60 +1305,69 @@ sub handle_git {
             
             # determine if we need a branch or tag checkout
             if ( defined $component{"REPO_BRANCH"} ) {
-                $branch = $component{"REPO_BRANCH"};
-                # determine if $branch is actually a tag
-                if ( `cd $repo_loc && $git tag -l` =~ /^$branch/m ) {
-                    $tag = $branch;
-                    $branch = undef;
-                }
-            }
+                @branches = split(/, /, $component{"REPO_BRANCH"});
+                my $real_branches = `cd $repo_loc && $git tag -l`;
+                for $branch (@branches) {
+                    # determine if $branch is actually a tag
+                    if ( $real_branches =~ /^$branch/m ) {
+                        $tag = $branch;
+                        $branch = undef;
+                    }
             
-            if ( defined $branch ) {
-                $cmd = "cd $repo_loc && "
-                  . "$git checkout --track -b $branch origin/$branch";
-                my ( $err, $out ) = run_command($cmd);
-                if ($err) {
-                    my $new;
-                    if ( -e "$repo_loc.branch.failed" ) {
-                        my @times = glob "$repo_loc.branch.failed*";
-                        $new = "$repo_loc.branch.failed."
-                                . scalar @times;
-                    } else {
-                        $new = "$repo_loc.branch.failed"
+                    if ( defined $branch ) {
+                        $cmd = "cd $repo_loc && "
+                          . "$git checkout --track -b $branch origin/$branch";
+                        if ( $branch eq 'master' ) {
+                            # fix for master branch
+                            $cmd = "cd $repo_loc && $git checkout master";
+                        }
+                        my ( $err, $out ) = run_command($cmd);
+                        if ($err) {
+                            my $new;
+                            if ( -e "$repo_loc.branch.failed" ) {
+                                my @times = glob "$repo_loc.branch.failed*";
+                                $new = "$repo_loc.branch.failed."
+                                        . scalar @times;
+                            } else {
+                                $new = "$repo_loc.branch.failed"
+                            }
+                            run_command("mv $repo_loc $new");
+                            $updated_git_repos{$git_repo} = -1;
+                            my $log =
+                                "Could not checkout $checkout, "
+                              . "unable to switch to branch $branch. "
+                              . "Any existing symlinks to $checkout will be "
+                              . "broken";
+                            WARN($log);
+                            push( @components_error,
+                                $checkout . ": symlinks may be broken" );
+                            return $err;
+                        }
+                    } elsif ( defined $tag ) {
+                        $cmd = "cd $repo_loc && $git checkout $tag";
+                        my ( $err, $out ) = run_command($cmd);
+                        if ($err) {
+                            my $new;
+                            if ( -e "$repo_loc.branch.failed" ) {
+                                my @times = glob "$repo_loc.branch.failed*";
+                                $new = "$repo_loc.branch.failed."
+                                        . scalar @times;
+                            } else {
+                                $new = "$repo_loc.branch.failed"
+                            }
+                            run_command("mv $repo_loc $new");
+                            $updated_git_repos{$git_repo} = -1;
+                            my $log =
+                                "Could not checkout $checkout, "
+                              . "unable to switch to tag $branch. "
+                              . "Any existing symlinks to $checkout will be "
+                              . "broken";
+                            WARN($log);
+                            push( @components_error,
+                                $checkout . ": symlinks may be broken" );
+                            return $err;
+                        }
                     }
-                    run_command("mv $repo_loc $new");
-                    $updated_git_repos{$git_repo} = -1;
-                    my $log =
-                        "Could not checkout $checkout, "
-                      . "unable to switch to branch $branch. "
-                      . "Any existing symlinks to $checkout will be broken";
-                    WARN($log);
-                    push( @components_error,
-                        $checkout . ": symlinks may be broken" );
-                    return $err;
-                }
-            } elsif ( defined $tag ) {
-                $cmd = "cd $repo_loc && $git checkout $tag";
-                my ( $err, $out ) = run_command($cmd);
-                if ($err) {
-                    my $new;
-                    if ( -e "$repo_loc.branch.failed" ) {
-                        my @times = glob "$repo_loc.branch.failed*";
-                        $new = "$repo_loc.branch.failed."
-                                . scalar @times;
-                    } else {
-                        $new = "$repo_loc.branch.failed"
-                    }
-                    run_command("mv $repo_loc $new");
-                    $updated_git_repos{$git_repo} = -1;
-                    my $log =
-                        "Could not checkout $checkout, "
-                      . "unable to switch to tag $branch. "
-                      . "Any existing symlinks to $checkout will be broken";
-                    WARN($log);
-                    push( @components_error,
-                        $checkout . ": symlinks may be broken" );
-                    return $err;
                 }
             }
             $updated_git_repos{$git_repo} = 1;
@@ -1317,79 +1375,8 @@ sub handle_git {
 
         # if git repo has already been cloned, we will pull the latest version
         elsif ( $updated_git_repos{$git_repo} == 0 ) {
-            print_checkout_info( $checkout, $url, $target, $name );
-            
-            # determine if we have a branch or tag checkout
-            if ( defined $component{"REPO_BRANCH"} ) {
-                $branch = $component{"REPO_BRANCH"};
-                # determine if $branch is actually a tag
-                if ( `cd $repo_loc && $git tag -l` =~ /^$branch/m ) {
-                    $tag = $branch;
-                    $branch = undef;
-                }
-            }
-            
-            my ( $err, $out ) = run_command("cd $repo_loc && $git stash");
-            if ($err) {
-                push( @components_error, $checkout );
-                my $logmsg = "Could not update $git_repo. "
-                  . "Could not stash local changes.";
-                WARN($logmsg);
-                $updated_git_repos{$git_repo} = -1;
-                return $err;
-            }
-            # `git pull --rebase` will fail in detached HEAD state
-            # i.e. if we have checked out a tag
-            unless (defined($tag)) {
-                ( $err, $out ) = run_command("cd $repo_loc && $git pull --rebase");
-                if ($err) {
-                    push( @components_error, $checkout );
-                    my $logmsg = "Could not update $git_repo. "
-                      . "Could not pull in remote changes.";
-                    WARN($logmsg);
-                    $updated_git_repos{$git_repo} = -1;
-                    return $err;
-                }
-            } else {
-                ( $err, $out ) = run_command("cd $repo_loc && $git fetch");
-                if ($err) {
-                    push( @components_error, $checkout );
-                    my $logmsg = "Could not update $git_repo. "
-                      . "Could not fetch remote changes.";
-                    WARN($logmsg);
-                    $updated_git_repos{$git_repo} = -1;
-                    return $err;
-                }
-                ( $err, $out ) = run_command("cd $repo_loc && $git checkout $tag");
-                if ($err) {
-                    push( @components_error, $checkout );
-                    my $logmsg = "Could not update $git_repo. "
-                      . "Could not checkout specified tag.";
-                    WARN($logmsg);
-                    $updated_git_repos{$git_repo} = -1;
-                    return $err;
-                }
-            }
-            ( $err, $out ) = run_command("cd $repo_loc && $git stash pop");
-
-            # `git stash pop` returns 1 if there is no stash
-            if ( $err && $out !~ /no stash found|nothing to apply/i ) {
-                push( @components_error, $checkout );
-                my $logmsg = "Could not update $git_repo. "
-                  . "Could not pop stashed changes.";
-                WARN($logmsg);
-                $updated_git_repos{$git_repo} = -1;
-                return $err;
-            }
-            $err = 0 if $out =~ /no stash found|nothing to apply/i;
-
-            $updated_git_repos{$git_repo} = 1
-              unless $updated_git_repos{$git_repo} == -1;
+            git_update_repo( $git_repo, $repo_loc, $checkout, @branches );
         }
-
-        # if git repo has already been updated, we will print checkout info
-        # anyway to suggest that we didn't miss a module
-        else { print_checkout_info( $checkout, $url, $target, $name ) }
 
         my ( $checkout_dir, $checkout_item ) = split( /\//, $checkout );
         unless ( $checkout =~ m!/! ) {
@@ -1402,12 +1389,16 @@ sub handle_git {
         }
 
         my $target_dir = "$orig_dir/$target/$checkout_dir";
+        # $target could be absolute path already...
+        if ($target =~ m!^/!) {
+            $target_dir = "$target/$checkout_dir"
+        }
         run_command("mkdir -p $target_dir");
 
         # get relative path from target directory to directory containing the
         # repositories
         $git_repos_dir = File::Spec->abs2rel( "$orig_dir/$ROOT/repos",
-            "$orig_dir/$target/$checkout_dir" );
+            "$target_dir" );
 
         # now we create a symlink from the repo to the appropriate target
         if ( defined($repo_path) ) {
@@ -1489,73 +1480,9 @@ sub handle_git {
             }
             print_update_info( $checkout, $url, $target, $name );
             
-            # determine if we have a branch or tag checkout
-            if ( defined $component{"REPO_BRANCH"} ) {
-                $branch = $component{"REPO_BRANCH"};
-                # determine if $branch is actually a tag
-                if ( `cd $repo_loc && $git tag -l` =~ /^$branch/m ) {
-                    $tag = $branch;
-                    $branch = undef;
-                }
-            }
-
-            my ( $err, $out ) = run_command("cd $repo_loc && $git stash");
-            if ($err) {
-                push( @components_error, $checkout );
-                my $logmsg = "Could not update $git_repo. "
-                  . "Could not stash local changes.";
-                WARN($logmsg);
-                $updated_git_repos{$git_repo} = -1;
-                return $err;
-            }
-            # `git pull --rebase` will fail in detached HEAD state
-            # i.e. if we have checked out a tag
-            unless (defined($tag)) {
-                ( $err, $out ) = run_command("cd $repo_loc && $git pull --rebase");
-                if ($err) {
-                    push( @components_error, $checkout );
-                    my $logmsg = "Could not update $git_repo. "
-                      . "Could not pull in remote changes.";
-                    WARN($logmsg);
-                    $updated_git_repos{$git_repo} = -1;
-                    return $err;
-                }
-            } else {
-                ( $err, $out ) = run_command("cd $repo_loc && $git fetch");
-                if ($err) {
-                    push( @components_error, $checkout );
-                    my $logmsg = "Could not update $git_repo. "
-                      . "Could not fetch remote changes.";
-                    WARN($logmsg);
-                    $updated_git_repos{$git_repo} = -1;
-                    return $err;
-                }
-                ( $err, $out ) = run_command("cd $repo_loc && $git checkout $tag");
-                if ($err) {
-                    push( @components_error, $checkout );
-                    my $logmsg = "Could not update $git_repo. "
-                      . "Could not checkout specified tag.";
-                    WARN($logmsg);
-                    $updated_git_repos{$git_repo} = -1;
-                    return $err;
-                }
-            }
-            ( $err, $out ) = run_command("cd $repo_loc && $git stash pop");
-
-            # `git stash pop` returns 1 if there is no stash
-            if ( $err && $out !~ /no stash found|nothing to apply/i ) {
-                push( @components_error, $checkout );
-                my $logmsg = "Could not update $git_repo. "
-                  . "Could not pop stashed changes.";
-                WARN($logmsg);
-                $updated_git_repos{$git_repo} = -1;
-                return $err;
-            }
-            $err = 0 if $out =~ /no stash found|nothing to apply/i;
-
-            $updated_git_repos{$git_repo} = 1
-              unless $updated_git_repos{$git_repo} == -1;
-
+            my $err = git_update_repo( $git_repo, $repo_loc, $checkout,
+                                       @branches);
+            
             if ($PARALLEL) {
                 $semaphores{$git_repo}->up();
             }
@@ -1564,7 +1491,10 @@ sub handle_git {
 
         # if git repo has already been updated print update info anyway
         # to suggest that we didn't miss a module
-        else { print_update_info( $checkout, $url, $target, $name ); return 0; }
+        else {
+            print_update_info( $checkout, $url, $target, $name );
+            return 0; 
+        }
     }
 
     elsif ( $method eq 'status' ) {
@@ -1620,6 +1550,173 @@ sub handle_git {
         return ( $out =~ /$url/ );
     }
     else { DIE("Unrecognized checkout method: $method") }
+}
+
+sub git_update_repo {
+    my ( $git_repo, $repo_loc, $checkout, @branches ) = @_;
+    
+    # determine if we need to stash local changes
+    my ( $err, $out ) = run_command("cd $repo_loc && $git status --porcelain --untracked-files=no");
+    my $stash = $out;
+    if ($stash) {
+        # found local changes, stash them
+        my ( $err, $out ) = run_command("cd $repo_loc && $git stash");
+        if ($err) {
+            push( @components_error, $checkout );
+            my $logmsg = "Could not update $git_repo. "
+              . "Could not stash local changes.";
+            WARN($logmsg);
+            $updated_git_repos{$git_repo} = -1;
+            return $err;
+        }
+    }
+    
+    # update remote origin to make sure we can see all remote branches
+    ( $err, $out ) = run_command("cd $repo_loc && $git remote update origin");
+    if ($err) {
+        push( @components_error, $checkout );
+        my $logmsg = "Could not update $git_repo. "
+          . "Could not update remote 'origin'.";
+        WARN($logmsg);
+        $updated_git_repos{$git_repo} = -1;
+        return $err;
+    }
+    
+    # what branch/tag are we on?
+    ( $err, $out ) = run_command("cd $repo_loc && $git branch");
+    $out =~ /^\*\s*(.*)/m;
+    my $current_branch = $1;
+    if ($current_branch =~ /no branch/) {
+        # figure out which tag we're on....
+        my $commit = `cd $repo_loc && $git rev-parse HEAD`;
+        $current_branch = `cd $repo_loc && $git tag --contains $commit`;
+    }
+    
+    # now loop through specified branches, and append 'master'
+    push @branches, 'master';
+    for my $branch (@branches) {
+        # three possibilities: 
+        # 1. branch exists locally, needs update
+        # 2. branch exists remotely, needs local tracking branch
+        # 3. branch is actually tag, do nothing
+
+        if ( `cd $repo_loc && $git branch` =~ /$branch/m ) {
+            # case 1
+            # checkout branch and pull --rebase
+            ( $err, $out ) = run_command(
+                            "cd $repo_loc && " .
+                            "$git checkout $branch && " .
+                            "$git pull --rebase origin $branch");
+            if ($err) {
+                push( @components_error, $checkout );
+                my $logmsg = "Could not update $git_repo. "
+                  . "Could not update branch $branch.";
+                WARN($logmsg);
+                $updated_git_repos{$git_repo} = -1;
+                return $err;
+            }
+        } elsif ( `cd $repo_loc && $git branch -r` =~ /$branch/m ) {
+            # dealing with a remote tracking branch
+            ( $err, $out ) = run_command(
+                        "cd $repo_loc && " .
+                        "$git checkout --track -b $branch origin/$branch");
+            if ($err) {
+                push( @components_error, $checkout );
+                my $logmsg = "Could not update $git_repo. "
+                  . "Could not create local branch for $branch.";
+                WARN($logmsg);
+                $updated_git_repos{$git_repo} = -1;
+                return $err;
+            }
+        } # no need for else statement, do nothing for tags
+    }
+    
+    # now checkout original branch
+    ( $err, $out ) = run_command("cd $repo_loc && $git checkout $current_branch");
+    if ($err) {
+        push( @components_error, $checkout );
+        my $logmsg = "Could not update $git_repo. "
+          . "Could not checkout original branch.";
+        WARN($logmsg);
+        $updated_git_repos{$git_repo} = -1;
+        return $err;
+    }
+    
+    # now pop stash if necessary
+    if ($stash) {
+        ( $err, $out ) = run_command("cd $repo_loc && $git stash pop");
+        if ($err) {
+            push( @components_error, $checkout );
+            my $logmsg = "Could not update $git_repo. "
+              . "Could not pop stashed changes.";
+            WARN($logmsg);
+            $updated_git_repos{$git_repo} = -1;
+            return $err;
+        }
+    }
+    
+    # # determine if we have a branch or tag checkout
+    # if ( @branches ) {
+    #     $branch = pop @branches;
+    #     # determine if $branch is actually a tag
+    #     if ( `cd $repo_loc && $git tag -l` =~ /^$branch/m ) {
+    #         $tag = $branch;
+    #         $branch = undef;
+    #     }
+    # }
+    # 
+    # 
+    # # `git pull --rebase` will fail in detached HEAD state
+    # # i.e. if we have checked out a tag
+    # unless (defined($tag)) {
+    #     ( $err, $out ) = run_command("cd $repo_loc && $git pull --rebase");
+    #     if ($err) {
+    #         push( @components_error, $checkout );
+    #         my $logmsg = "Could not update $git_repo. "
+    #           . "Could not pull in remote changes.";
+    #         WARN($logmsg);
+    #         $updated_git_repos{$git_repo} = -1;
+    #         return $err;
+    #     }
+    # } else {
+    #     ( $err, $out ) = run_command("cd $repo_loc && $git fetch");
+    #     if ($err) {
+    #         push( @components_error, $checkout );
+    #         my $logmsg = "Could not update $git_repo. "
+    #           . "Could not fetch remote changes.";
+    #         WARN($logmsg);
+    #         $updated_git_repos{$git_repo} = -1;
+    #         return $err;
+    #     }
+    #     ( $err, $out ) = run_command("cd $repo_loc && $git checkout $tag");
+    #     if ($err) {
+    #         push( @components_error, $checkout );
+    #         my $logmsg = "Could not update $git_repo. "
+    #           . "Could not checkout specified tag.";
+    #         WARN($logmsg);
+    #         $updated_git_repos{$git_repo} = -1;
+    #         return $err;
+    #     }
+    # }
+    # 
+    # if ($stash) {
+    #     # pop stashed changes
+    #     ( $err, $out ) = run_command("cd $repo_loc && $git stash pop");
+    # 
+    #     # `git stash pop` returns 1 if there is no stash
+    #     if ($err) {
+    #         push( @components_error, $checkout );
+    #         my $logmsg = "Could not update $git_repo. "
+    #           . "Could not pop stashed changes.";
+    #         WARN($logmsg);
+    #         $updated_git_repos{$git_repo} = -1;
+    #         return $err;
+    #     }
+    # }
+    $updated_git_repos{$git_repo} = 1
+      unless $updated_git_repos{$git_repo} == -1;
+    
+    return $err;
 }
 
 sub handle_curl {
@@ -1755,8 +1852,7 @@ sub handle_darcs {
 
         # clone the darcs repo
         elsif ( !-e $repo_loc ) {
-            $cmd = "$darcs get$shallow$tag $url"
-              . " $orig_dir/$ROOT/repos/$darcs_repo";
+            $cmd = "$darcs get$shallow$tag $url $repo_loc";
             print_checkout_info( $checkout, $url, $target, $name );
             my ( $err, $out ) = run_command($cmd);
             if ($err) {
@@ -1802,12 +1898,16 @@ sub handle_darcs {
         }
 
         my $target_dir = "$orig_dir/$target/$checkout_dir";
+        # $target could be absolute path
+        if ($target =~ m!^/!) {
+            $target_dir = "$target/$checkout_dir"
+        }
         run_command("mkdir -p $target_dir");
 
         # get relative path from target directory to directory containing the
         # repositories
         $darcs_repos_dir = File::Spec->abs2rel( "$orig_dir/$ROOT/repos",
-            "$orig_dir/$target/$checkout_dir" );
+            "$target_dir" );
 
         # now we create a symlink from the repo to the appropriate target
         if ( defined($repo_path) ) {
@@ -2177,12 +2277,16 @@ sub handle_hg {
         }
 
         my $target_dir = "$orig_dir/$target/$checkout_dir";
+        # $target could be absolute path
+        if ($target =~ m!^/!) {
+            $target_dir = "$target/$checkout_dir"
+        }
         run_command("mkdir -p $target_dir");
 
         # get relative path from target directory to directory containing the
         # repositories
         $hg_repos_dir = File::Spec->abs2rel( "$orig_dir/$ROOT/repos",
-            "$orig_dir/$target/$checkout_dir" );
+            "$target_dir" );
 
         # now we create a symlink from the repo to the appropriate target
         if ( defined($repo_path) ) {

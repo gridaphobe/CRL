@@ -13,9 +13,10 @@ Usage
 -----
     ./GetComponents [options] [file|URL]
 
-GetComponents will accept a CRL file specified locally or remotely, in which case
-it will download the remote file. It can checkout and update components (also from a
-specific date), show the status of all components, and do a diff on all components.
+GetComponents will accept a CRL file specified locally or remotely, in which
+case it will download the remote file. It can checkout and update components
+(also from a specific date), show the status of all components, and do a diff
+on all components.
 
 For a full overview of the options and the CRL syntax look at the [wiki][]
 or look at the built-in documentation with
@@ -45,15 +46,15 @@ finish it. generateCRL.py is basically a reverse GetComponents script. It will
 analyze the contents of the working directory and generate a CRL file, 
 allowing you to checkout the same items on another computer without having
 to write the CRL yourself. It is very new and only supports svn and cvs right 
-now (it will not produce the correct checkout path if you used "cvs checkout 
--d").
+now (it will not produce the correct checkout path if you used 
+`cvs checkout -d`").
 
 Author
 ------
 [Eric Seidel][eseidel]
 
-[eseidel]:http://www.eseidel.org
-[GetComponents]:http://www.eseidel.org/projects/GetComponents
+[eseidel]:http://eseidel.org
+[GetComponents]:http://eseidel.org/projects/getcomponents
 [cctk]:http://www.cactuscode.org
 [wiki]:http://github.com/gridaphobe/CRL/wiki
 [et]:http://www.einsteintoolkit.org
