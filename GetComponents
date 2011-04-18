@@ -290,10 +290,12 @@ sub parse_list {
                 last;
             }
             if (m/\w/) {
+                $|++;
                 print "$LIST is not a CRL file.\n";
                 print "Do you want to continue? yes no [no]: ";
                 my $answer = <STDIN>;
                 chomp $answer;
+                $|--;
                 exit unless $answer =~ /^y/;
                 last;
             }
@@ -418,6 +420,7 @@ sub parse_list {
             print Dumper %rec;
             die();
         }
+        $|++;
         if ( ( $rec{"TYPE"} eq "cvs" ) && ( !$cvs_found ) ) {
             print "You have requested a cvs checkout, "
               . "but the system was unable to find cvs.\n";
@@ -517,7 +520,7 @@ sub parse_list {
             }
             else { $hg_found = 1 }
         }
-
+        $|--;
         # check for svn SSL problems
         if ( $rec{"TYPE"} eq "svn" && defined $rec{"AUTH_URL"} ) {
             my $base = $rec{"AUTH_URL"};
@@ -715,10 +718,12 @@ sub print_list {
             $num_updates++;
         }
     }
+    $|++;
     print $num_checkouts. " components will be checked out.\n";
     print $num_updates. " components will be updated.\n";
     print "Would you like a detailed list? [yes no] ";
     my $answer = <STDIN>;
+    $|--;
     if ( $answer =~ /y/ ) {
         foreach my $group ( values %components_to_checkout ) {
             foreach my $component ( @{$group} ) {
@@ -742,6 +747,7 @@ sub get_status {
     foreach my $component (@all_components) {
         $checkout_types{ $component->{TYPE} }->( 'status', %{$component} );
     }
+    $|++;
     print "Would you like a diff for these files? yes [no] ";
     my $answer = <STDIN>;
     if ( $answer =~ /y/ ) { get_diff() }
@@ -848,11 +854,13 @@ sub process_users {
                 if ( $component->{AUTH_URL} =~ /([^\/]+)@/ ) {
                     $user = $1;
                 }
+                $|++;
                 print "No user found for $component->{AUTH_URL_ORIG}\n";
                 print "Please enter your username ('-' for anonymous access) "
                   . "[$user]: ";
                 my $answer = <STDIN>;
                 chomp $answer;
+                $|--;
 
                 # we want to save that the user wants to use anonymous access
                 if ( $answer =~ /^-$/ ) {
@@ -923,10 +931,11 @@ sub prompt_for_update {
 
     # if there are no components to update there's no reason to ask..
     return unless scalar( values %components_to_update );
-
+    $|++;
     print "Do you want to update all existing components? yes, no [no] : ";
     my $answer = <STDIN>;
     chomp $answer;
+    $|--;
     $DO_UPDATES = 1 if ( $answer =~ /^y/ );
 }
 
