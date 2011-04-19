@@ -1255,12 +1255,25 @@ sub handle_svn {
 
     elsif ( $method eq 'verify_url' ) {
         my $dir = defined($name) ? $name : $checkout;
-        my $cmd = "$svn info $target/$dir";
+        my $cmd = "$svn info --xml $target/$dir";
 
         my $same_url;
+        my $new_url = $url;
         $url =~ s!https?://!!;
         my ( $err, $out ) = run_command($cmd);
-        return ($out =~ /URL:.*$url/);
+        $out =~ m!<url>(.*)</url>!;
+        my $old_url = $1;
+        unless ($old_url =~ /$url/) {
+            # URL's don't match. try `svn switch`
+            ( $err, $out ) = run_command("$svn switch $new_url $target/$dir");
+            if ($err) {
+                # repo might have moved. try `svn switch --relocate`
+                ( $err, $out ) = run_command("$svn switch --relocate $old_url $new_url $target/$dir");
+            }
+            # exit code 0 means no error, but 0 is boolean false...
+            return !$err;
+        }
+        return 1;
     }
     
     else { DIE("Unrecognized checkout method: $method") }
