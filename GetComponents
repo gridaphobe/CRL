@@ -70,6 +70,7 @@ my @all_components;
 my $checkout_size : shared = 0;
 my $update_size : shared   = 0;
 my @components_error : shared;
+my @warnings : shared;
 my %svn_servers : shared;
 my $ROOT               = '';
 my $VERBOSE            = 0;
@@ -187,24 +188,17 @@ exit( @components_error > 0 );
 ##########################################################################
 
 sub process_args() {
-    unless ( @ARGV || ( -e "$crl_dir/component_lists" ) ) {
-        pod2usage( "\n$0: No files given.\nSpecify -man "
+    unless ( @ARGV || ( -e ".crl/component_list.crl" ) ) {
+        pod2usage( "\n$0: No files given.\nSpecify --man "
               . "for an explanation of how to use this script.\n\n" );
     }
 
-    # not using this option currently
     if ( @ARGV == 0 ) {
-        my $list_dir = "$crl_dir/component_lists";
-        opendir( DIR, $list_dir ) || DIE("Can't open $list_dir");
-        my @files = grep { ( !/^\./ ) && -f "$list_dir/$_" } readdir(DIR);
-        closedir DIR;
-        print "The following component lists were found:\n";
-        for my $file (@files) {
-            print "$file\n";
-        }
-        print "Would you like to update these? [(y)es no] ";
-        my $answer = <STDIN>;
-        exit;
+        my $list = ".crl/component_list.crl";
+        push @ORIG_LISTS, $list;
+        push @CRL_LISTS, $list;
+        # set $ROOT so it isn't overwritten by definition in file
+        $ROOT = '.';
     }
     else {
         foreach my $ARG (@ARGV) {
@@ -296,10 +290,12 @@ sub parse_list {
                 last;
             }
             if (m/\w/) {
+                $|++;
                 print "$LIST is not a CRL file.\n";
                 print "Do you want to continue? yes no [no]: ";
                 my $answer = <STDIN>;
                 chomp $answer;
+                $|--;
                 exit unless $answer =~ /^y/;
                 last;
             }
@@ -374,7 +370,7 @@ sub parse_list {
     $file =~ s/(?<!\\)\$(\w+)/
                         exists $DEFINITIONS{$1} ? $DEFINITIONS{$1} : '$'.$1
                         /egm;
-    if ($file =~ /\\\$(\w+)/) {
+    if ($file =~ /(?<!\\)\$([A-Za-z]\w*)/) {
         # make sure that escaped definitions are environment variables
         for my $match ($+) {
             #print "$match\n";
@@ -383,7 +379,7 @@ sub parse_list {
             }
         }
         # now replace escaped defs with env variables
-        $file =~ s/\\\$(\w+)/$ENV{$1}/g;
+        $file =~ s/(?<!\\)\$([A-Za-z]\w*)/$ENV{$1}/g;
     }
     # if $ROOT is undefined, it will be set to the current directory
     if   ( defined( $DEFINITIONS{ROOT} ) ) { $ROOT = $DEFINITIONS{ROOT} }
@@ -424,6 +420,7 @@ sub parse_list {
             print Dumper %rec;
             die();
         }
+        $|++;
         if ( ( $rec{"TYPE"} eq "cvs" ) && ( !$cvs_found ) ) {
             print "You have requested a cvs checkout, "
               . "but the system was unable to find cvs.\n";
@@ -523,7 +520,7 @@ sub parse_list {
             }
             else { $hg_found = 1 }
         }
-
+        $|--;
         # check for svn SSL problems
         if ( $rec{"TYPE"} eq "svn" && defined $rec{"AUTH_URL"} ) {
             my $base = $rec{"AUTH_URL"};
@@ -722,10 +719,12 @@ sub print_list {
             $num_updates++;
         }
     }
+    $|++;
     print $num_checkouts. " components will be checked out.\n";
     print $num_updates. " components will be updated.\n";
     print "Would you like a detailed list? [yes no] ";
     my $answer = <STDIN>;
+    $|--;
     if ( $answer =~ /y/ ) {
         foreach my $group ( values %components_to_checkout ) {
             foreach my $component ( @{$group} ) {
@@ -749,6 +748,7 @@ sub get_status {
     foreach my $component (@all_components) {
         $checkout_types{ $component->{TYPE} }->( 'status', %{$component} );
     }
+    $|++;
     print "Would you like a diff for these files? yes [no] ";
     my $answer = <STDIN>;
     if ( $answer =~ /y/ ) { get_diff() }
@@ -793,15 +793,27 @@ sub write_componentlist_target {
     # find directory to put file into
     my $fn = $ROOT;
     if ( defined( $DEFINITIONS{"COMPONENTLIST_TARGET"} ) ) {
+        # this means the user specified a location for the list
         $fn = $DEFINITIONS{"COMPONENTLIST_TARGET"};
         run_command("mkdir -p '$fn'");
+
+        # find file name
+        my $short_name = $CRL_LISTS[0];
+        $short_name =~ s/.*\///g;
+        $fn .= "/$short_name";
+
+        # write file
+        open( ALL, ">$fn" ) or die("Could not write file $fn");
+        print ALL $combined_components;
+        close(ALL);
     }
 
-    # find file name
-    my $short_name = $CRL_LISTS[0];
-    $short_name =~ s/.*\///g;
-    $fn .= "/$short_name";
-
+    # we'll also store it in the default location
+    $fn = "$ROOT/.crl/component_list.crl";
+    # perl can't create dirs for a file
+    unless (-e "$ROOT/.crl") {
+        mkdir "$ROOT/.crl";
+    }
     # write file
     open( ALL, ">$fn" ) or die("Could not write file $fn");
     print ALL $combined_components;
@@ -843,11 +855,13 @@ sub process_users {
                 if ( $component->{AUTH_URL} =~ /([^\/]+)@/ ) {
                     $user = $1;
                 }
+                $|++;
                 print "No user found for $component->{AUTH_URL_ORIG}\n";
                 print "Please enter your username ('-' for anonymous access) "
                   . "[$user]: ";
                 my $answer = <STDIN>;
                 chomp $answer;
+                $|--;
 
                 # we want to save that the user wants to use anonymous access
                 if ( $answer =~ /^-$/ ) {
@@ -918,10 +932,11 @@ sub prompt_for_update {
 
     # if there are no components to update there's no reason to ask..
     return unless scalar( values %components_to_update );
-
+    $|++;
     print "Do you want to update all existing components? yes, no [no] : ";
     my $answer = <STDIN>;
     chomp $answer;
+    $|--;
     $DO_UPDATES = 1 if ( $answer =~ /^y/ );
 }
 
@@ -1052,7 +1067,7 @@ sub handle_cvs {
         my ( $err, $out ) = run_command($cmd);
         if ( $err != 0 || $out =~ /^cvs:/gmi ) {
             my $log = "Could not check out module $checkout\n";
-            $out =~ s'^(?!\S*:\s).*$''gmi;
+            #$out =~ s'^(?!\S*:\s).*$''gmi;
             $log .= $out;
             WARN($log);
             push( @components_error, $checkout );
@@ -1069,7 +1084,7 @@ sub handle_cvs {
         my ( $err, $out ) = run_command($cmd);
         if ( $err != 0 || $out =~ /^cvs:/gmi ) {
             my $log = "Could not update module $checkout\n";
-            $out =~ s'^(?!\S*:\s).*$''gmi;
+            #$out =~ s'^(?!\S*:\s).*$''gmi;
             $log .= $out;
             WARN($log);
             push( @components_error, $checkout );
@@ -1171,6 +1186,7 @@ sub handle_svn {
         if ( $err || $out =~ /^svn/gmi ) {
             my $log = "Could not checkout module $checkout\n";
             $out =~ s/^(?!svn).*$//gmi;
+            $out =~ s/\n+/\n/g;
             $log .= $out;
             WARN($log);
             push( @components_error, $checkout );
@@ -1188,6 +1204,7 @@ sub handle_svn {
         if ( $err || $out =~ /^svn/gmi ) {
             my $log = "Could not update module $checkout\n";
             $out =~ s/^(?!svn).*$//gmi;
+            $out =~ s/\n+/\n/g;
             $log .= $out;
             WARN($log);
             push( @components_error, $checkout );
@@ -1239,12 +1256,25 @@ sub handle_svn {
 
     elsif ( $method eq 'verify_url' ) {
         my $dir = defined($name) ? $name : $checkout;
-        my $cmd = "$svn info $target/$dir";
+        my $cmd = "$svn info --xml $target/$dir";
 
         my $same_url;
+        my $new_url = $url;
         $url =~ s!https?://!!;
         my ( $err, $out ) = run_command($cmd);
-        return ($out =~ /URL:.*$url/);
+        $out =~ m!<url>(.*)</url>!;
+        my $old_url = $1;
+        unless ($old_url =~ /$url/) {
+            # URL's don't match. try `svn switch`
+            ( $err, $out ) = run_command("$svn switch $new_url $target/$dir");
+            if ($err) {
+                # repo might have moved. try `svn switch --relocate`
+                ( $err, $out ) = run_command("$svn switch --relocate $old_url $new_url $target/$dir");
+            }
+            # exit code 0 means no error, but 0 is boolean false...
+            return !$err;
+        }
+        return 1;
     }
     
     else { DIE("Unrecognized checkout method: $method") }
@@ -1294,6 +1324,7 @@ sub handle_git {
             if ($err) {
                 my $log = "Could not checkout module $checkout\n";
                 $out =~ s/^(?!fatal).*$//gmi;
+                $out =~ s/\n+/\n/g;
                 $log .= $out;
                 WARN($log);
                 push( @components_error, $checkout );
@@ -1314,6 +1345,10 @@ sub handle_git {
                     if ( defined $branch ) {
                         $cmd = "cd $repo_loc && "
                           . "$git checkout --track -b $branch origin/$branch";
+                        if ( $branch eq 'master' ) {
+                            # fix for master branch
+                            $cmd = "cd $repo_loc && $git checkout master";
+                        }
                         my ( $err, $out ) = run_command($cmd);
                         if ($err) {
                             my $new;
@@ -1851,6 +1886,7 @@ sub handle_darcs {
             if ($err) {
                 my $log = "Could not checkout module $checkout\n";
                 $out =~ s/^(?!darcs).*$//gmi;
+                $out =~ s/\n+/\n/g;
                 $log .= $out;
                 WARN($log);
                 push( @components_error, $checkout );
@@ -1868,6 +1904,7 @@ sub handle_darcs {
             if ($err) {
                 my $log = "Could not checkout module $checkout\n";
                 $out =~ s/^(?!darcs).*$//gmi;
+                $out =~ s/\n+/\n/g;
                 $log .= $out;
                 WARN($log);
                 push( @components_error, $checkout );
@@ -1984,6 +2021,7 @@ sub handle_darcs {
             if ($err) {
                 my $log = "Could not update module $checkout\n";
                 $out =~ s/^(?!darcs).*$//gmi;
+                $out =~ s/\n+/\n/g;
                 $log .= $out;
                 WARN($log);
                 push( @components_error, $checkout );
@@ -2179,6 +2217,7 @@ sub handle_hg {
             if ($err) {
                 my $log = "Could not checkout module $checkout\n";
                 $out =~ s/^(?!abort).*$//gmi;
+                $out =~ s/\n+/\n/g;
                 $log .= $out;
                 WARN($log);
                 push( @components_error, $checkout );
@@ -2247,6 +2286,7 @@ sub handle_hg {
             if ($err) {
                 my $log = "Could not checkout module $checkout\n";
                 $out =~ s/^(?!abort).*$//gmi;
+                $out =~ s/\n+/\n/g;
                 $log .= $out;
                 WARN($log);
                 push( @components_error, $checkout );
@@ -2362,6 +2402,7 @@ sub handle_hg {
             if ($err) {
                 my $log = "Could not update module $checkout\n";
                 $out =~ s/^(?!abort).*$//gmi;
+                $out =~ s/\n+/\n/g;
                 $log .= $out;
                 WARN($log);
                 push( @components_error, $checkout );
@@ -2435,18 +2476,18 @@ sub run_command {
     my $VERBOSE_OVERRIDE = shift;
     my $show_err         = shift;
     my $verbose = defined $VERBOSE_OVERRIDE ? $VERBOSE_OVERRIDE : $VERBOSE;
-    my $err = defined $show_err ? '' : ' 2>&1';
+    my $err = $show_err ? '' : '2>&1';
     if ( $command =~ /^$/ ) { return }
     if ($verbose) {
 
         if ( $command =~ /^cd (.*) \&\& (.*)$/ ) {
             my ( $cmd, $loc ) = ( $2, $1 );
             print BOLD, "Executing: ", RESET, "$cmd\n",
-              BOLD, "       In: ", RESET, "$loc\n";
+                  BOLD, "       In: ", RESET, "$loc\n";
         }
         else { print BOLD, "Executing: ", RESET, "$command\n" }
     }
-    my $out = `$command$err`;
+    my $out = `$command $err`;
     my $ret = $?;
     print $out if $verbose;
     return ( $ret, $out );
@@ -2510,6 +2551,10 @@ sub print_summary {
           . " errors occurred during update from thornlist(s): ";
         $logmsg .= join( ' , ', @ORIG_LISTS );
         &LOG($logmsg);
+        print "Summary of Warnings:\n\n";
+        foreach my $warning (@warnings) {
+            print "$warning\n";
+        }
     }
 
     my $elapsed_time = time - $start_time;
@@ -2564,6 +2609,7 @@ sub LOG {
 sub WARN {
     my $warning = shift;
     LOG($warning);
+    push( @warnings, $warning );
     warn( "\n", BOLD, RED, "Warning: ", RESET, "$warning\n\n" );
 }
 
