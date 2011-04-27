@@ -639,6 +639,7 @@ sub parse_list {
                 } else {
                     $hg_repo = $rec{"URL"};
                     $hg_repo =~ s/\.hg$//;
+                    $hg_repo =~ s/\/$//g;
                     $hg_repo =~ s/^.*[:\/]//;
                 }
                 $rec{"HG_REPO"} = $hg_repo;
