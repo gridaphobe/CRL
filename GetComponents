@@ -2356,10 +2356,12 @@ sub handle_hg {
             # checkout entire repo
             $cmd = "cd $target_dir && " . "$ln $hg_repos_dir/$hg_repo $name";
             if ( $orig_dir eq $ROOT ) { $cmd =~ s!$orig_dir/!! }
-            return if ( -e "$target_dir/$name" );
-            my ( $err, $out ) = run_command($cmd);
-            if ($err) {
-                push( @components_error, $checkout . ": symlink error." );
+            my ($err, $out) = (0, "");
+            if ( not -e "$target_dir/$name" ) {
+                ( $err, $out ) = run_command($cmd);
+                if ($err) {
+                    push( @components_error, $checkout . ": symlink error." );
+                }
             }
             if ($PARALLEL) {
                 $semaphores{$hg_repo}->up();
@@ -2370,12 +2372,13 @@ sub handle_hg {
             $cmd = "cd $target_dir && "
               . "$ln $hg_repos_dir/$hg_repo/$checkout $checkout_item";
             if ( $orig_dir eq $ROOT ) { $cmd =~ s!$orig_dir/!! }
-            return if ( -e "$target_dir/$checkout_item" );
-            my ( $err, $out ) = run_command($cmd);
-            if ($err) {
-                push( @components_error, $checkout . ": symlink error." );
+            my ($err, $out) = (0, "");
+            if ( not -e "$target_dir/$checkout_item" ) {
+                ( $err, $out ) = run_command($cmd);
+                if ($err) {
+                    push( @components_error, $checkout . ": symlink error." );
+                }
             }
-
             if ($PARALLEL) {
                 $semaphores{$hg_repo}->up();
             }
