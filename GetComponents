@@ -253,9 +253,9 @@ sub download_include {
     if ( -e "$crl_dir/include_tmp" ) {
         unlink("$crl_dir/include_tmp");
     }
-    if (   !$curl_found
-        or run_command("$curl '$url' -o $crl_dir/include_tmp")
-        or run_command("$wget '$url' -O $crl_dir/include_tmp") )
+    if ((   !$curl_found
+         or (run_command("$curl '$url' -o $crl_dir/include_tmp"))[0])
+        and (run_command("$wget '$url' -O $crl_dir/include_tmp"))[0] )
     {
         DIE("Couldn't download include url $url correctly\n");
     }
