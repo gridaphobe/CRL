@@ -1028,7 +1028,7 @@ sub handle_cvs {
             $url = "$user\@$url" if defined $user;
         }
     }
-    else {
+    elsif ( defined( $component{ANON_USER} ) && defined( $component{ANON_PASS} ) ) {
         $url  = $component{URL};
         $user = $component{ANON_USER};
         $pass = $component{ANON_PASS};
@@ -1038,6 +1038,11 @@ sub handle_cvs {
         else {
             $url = "$user:$pass\@$url";
         }
+    }
+    # This handles cvs repositories which use external means to authenticate,
+    # especially SSH
+    else {
+        $url  = $component{URL};
     }
 
     if ( $method eq 'checkout' ) {
