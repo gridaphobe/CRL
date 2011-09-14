@@ -2198,6 +2198,9 @@ sub handle_hg {
     my $target       = $component{"TARGET"};
     my $name         = $component{"NAME"};
     my $url          = $component{"URL"};
+    if ( defined( $component{"AUTH_URL"} ) ) {
+        $url     = $component{"AUTH_URL"};
+    }
     my $checkout     = $component{"CHECKOUT"};
     my $repo_path    = $component{"REPO_PATH"};
     my $hg_repo      = $component{"HG_REPO"};
@@ -2476,6 +2479,9 @@ sub handle_hg {
         my $cmd = "cd $repo_loc && $hg showconfig paths.default";
         my ( $err, $out ) = run_command($cmd);
         $verified_hg_repos{$hg_repo} = 1;
+        # match against either anonymous or authenticated URL, assuming
+        # both point to actually the same repository
+        $url = "(".$component{"URL"}.")|(".$component{"AUTH_URL"}.")";
         return ( $out =~ /$url/ );
     }
 
