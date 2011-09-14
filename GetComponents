@@ -1224,7 +1224,7 @@ sub handle_svn {
                      "trying relocation");
                 push( @components_error, $checkout );
             } else {
-                $cmd = "cd $target/$dir && $svn switch --relocate $old_location $new_location";
+                $cmd = "cd $target/$dir && $svn --non-interactive switch --relocate $old_location $new_location";
                 ( $err, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
                 if ( $err || $out =~ /^svn/gmi ) {
                     WARN("Could not relocate module $checkout");
@@ -1297,10 +1297,10 @@ sub handle_svn {
         my $old_url = $1;
         unless ($old_url =~ /$url/) {
             # URL's don't match. try `svn switch`
-            ( $err, $out ) = run_command("$svn switch $new_url $target/$dir");
+            ( $err, $out ) = run_command("$svn --non-interactive switch $new_url $target/$dir");
             if ($err) {
                 # repo might have moved. try `svn switch --relocate`
-                ( $err, $out ) = run_command("$svn switch --relocate $old_url $new_url $target/$dir");
+                ( $err, $out ) = run_command("$svn --non-interactive switch --relocate $old_url $new_url $target/$dir");
                 if ($out =~ /^svn: Repository moved permanently to '(.*)'; please relocate$/) {
                     my $new_location = $1;
                     if ($new_location eq $old_url) { $err = 0; }
