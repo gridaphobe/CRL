@@ -1188,6 +1188,12 @@ sub handle_svn {
         # let svn print to stderr to facilitate dealing with
         # server certificate issues
         ( $err, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
+        # Check for relocated repositories
+        if ($out =~ /^svn: Repository moved permanently to '(.*)'; please relocate$/) {
+            my $new_location = $1;
+            $cmd = "cd $target && $svn checkout$user$date $new_location $dir";
+            ( $err, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
+        }
         if ( $err || $out =~ /^svn/gmi ) {
             my $log = "Could not checkout module $checkout\n";
             $out =~ s/^(?!svn).*$//gmi;
@@ -1206,6 +1212,26 @@ sub handle_svn {
 
         print_update_info( $checkout, $url, $target, $name );
         ( $err, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
+        # Check for relocated repositories
+        if ($out =~ /^svn: Repository moved permanently to '(.*)'; please relocate$/) {
+            my $new_location = $1;
+            $cmd = "cd $target/$dir && $svn info --non-interactive";
+            ( $err, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
+            $out =~ /^URL: (.*)$/m;
+            my $old_location = $1;
+            if (!defined($old_location)) {
+                WARN("Could not determine old location of module $checkout while ".
+                     "trying relocation");
+                push( @components_error, $checkout );
+            } else {
+                $cmd = "cd $target/$dir && $svn switch --relocate $old_location $new_location";
+                ( $err, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
+                if ( $err || $out =~ /^svn/gmi ) {
+                    WARN("Could not relocate module $checkout");
+                    push( @components_error, $checkout );
+                }
+            }
+        }
         if ( $err || $out =~ /^svn/gmi ) {
             my $log = "Could not update module $checkout\n";
             $out =~ s/^(?!svn).*$//gmi;
@@ -1275,6 +1301,10 @@ sub handle_svn {
             if ($err) {
                 # repo might have moved. try `svn switch --relocate`
                 ( $err, $out ) = run_command("$svn switch --relocate $old_url $new_url $target/$dir");
+                if ($out =~ /^svn: Repository moved permanently to '(.*)'; please relocate$/) {
+                    my $new_location = $1;
+                    if ($new_location eq $old_url) { $err = 0; }
+                }
             }
             # exit code 0 means no error, but 0 is boolean false...
             return !$err;
