@@ -5,45 +5,45 @@
 !DEFINE ROOT = TEST
 
 # Test CVS repo
-!TARGET		= $ROOT/cvs
-!TYPE		= cvs
-!URL		= :pserver:cvs-mirror.mozilla.org:/cvsroot
-!ANON_USER	= anonymous
-!ANON_PASS	= anonymous
-!CHECKOUT	= mozilla/browser
+!TARGET         = $ROOT/cvs
+!TYPE           = cvs
+!URL            = :pserver:cvs-mirror.mozilla.org:/cvsroot
+!ANON_USER      = anonymous
+!ANON_PASS      = anonymous
+!CHECKOUT       = mozilla/browser
 
 # Test svn repo
-!TARGET		= $ROOT/svn
-!TYPE		= svn
-!URL		= http://svn.eseidel.org/documents/resume
-!CHECKOUT	= resume
+!TARGET         = $ROOT/svn
+!TYPE           = svn
+!URL            = http://svn.eseidel.org/documents/resume
+!CHECKOUT       = resume
 
 # Test git repo
-!TARGET		= $ROOT/git
-!TYPE		= git
-!URL		= https://github.com/gridaphobe/CRL.git
-!REPO_BRANCH = stable, ET_2010_11, master
-!CHECKOUT	= GetComponents
-#!NAME = GetComponents
+!TARGET         = $ROOT/git
+!TYPE           = git
+!URL            = https://github.com/gridaphobe/CRL.git
+!REPO_BRANCH    = stable, ET_2010_11, master
+!CHECKOUT       = GetComponents
+# !NAME           = GetComponents
 
 # Test hg repo
-!TARGET		= $ROOT/hg
-!TYPE		= hg
-!URL		= https://hg.eseidel.org/pygravatar
-!CHECKOUT	= gravatar.py
-!REPO_BRANCH = 0.0.4
-!NAME = PyGravatar
+!TARGET         = $ROOT/hg
+!TYPE           = hg
+!URL            = https://hg.eseidel.org/pygravatar
+!CHECKOUT       = gravatar.py
+!REPO_BRANCH    = 0.0.4
+!NAME           = PyGravatar
 
 # Test darcs repo
-!TARGET     = $ROOT/darcs
-!TYPE       = darcs
-!URL        = http://darcs.net
-!REPO_BRANCH= 2.4
-!CHECKOUT   = src
-!NAME = test_darcs
+!TARGET         = $ROOT/darcs
+!TYPE           = darcs
+!URL            = http://darcs.net
+!REPO_BRANCH    = 2.4
+!CHECKOUT       = src
+!NAME           = test_darcs
 
 # Test http component
-!TARGET		= $ROOT/http
-!TYPE		= http
-!URL	 	= http://eseidel.org/download
-!CHECKOUT	= crl-tg10.pdf
+!TARGET         = $ROOT/http
+!TYPE           = http
+!URL            = http://eseidel.org/download
+!CHECKOUT       = crl-tg10.pdf
