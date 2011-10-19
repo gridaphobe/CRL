@@ -1171,7 +1171,7 @@ sub handle_svn {
     if ( defined( $component{"AUTH_URL"} ) ) {
         $url = $component{"AUTH_URL"};
         my $base = $url;
-        $base =~ s/(https\:\/\/[\w\.]+)\/(.*)$/$1/i;
+        $base =~ s!(https://[\w\.]+)/(.*)$!$1!i;
         unless ( $svn_servers{$base} ) {
             $bad_cert = 1;
         }
@@ -2690,6 +2690,8 @@ Options:
 
     --debug         print all commands to be executed and exit
 
+    --parallel      checkout/update components in parallel
+
     --anonymous     use anonymous checkout for all components
 
     --update        process all updates
@@ -2728,6 +2730,12 @@ from the commands.
 
 Print a list of components that will be checked out or updated, along with the
 total number of components in the list.
+
+=item B<--parallel>
+
+Run checkout and update commands in parallel. Requires perl to be compiled with
+support for threads. 4 threads are used so as not to overload the network, this
+may become configurable in the future.
 
 =item B<--anonymous>
 
