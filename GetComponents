@@ -152,6 +152,8 @@ GetOptions(
 pod2usage(1) if $HELP;
 pod2usage( -verbose => 2 ) if $MAN;
 
+system "touch .stdout-$$ .stderr-$$";
+
 find_tools();
 
 &process_args();
@@ -183,11 +185,12 @@ if ($DO_UPDATES) {
 write_componentlist_target();
 
 print_summary();
+system "rm .stdout-$$ .stderr-$$ &>/dev/null";
 exit( @components_error > 0 );
 
 ##########################################################################
 
-sub process_args() {
+sub process_args {
     unless ( @ARGV || ( -e ".crl/component_list.crl" ) ) {
         pod2usage( "\n$0: No files given.\nSpecify --man "
               . "for an explanation of how to use this script.\n\n" );
@@ -2543,6 +2546,7 @@ sub run_command {
     my $show_err         = shift;
     my $verbose = defined $VERBOSE_OVERRIDE ? $VERBOSE_OVERRIDE : $VERBOSE;
     my $err = $show_err ? '' : '2>&1';
+    my ($ret, $out, $tmp, $ste, $sto);
     if ( $command =~ /^$/ ) { return }
     if ($verbose) {
 
@@ -2552,10 +2556,18 @@ sub run_command {
                   BOLD, "       In: ", RESET, "$loc\n";
         }
         else { print BOLD, "Executing: ", RESET, "$command\n" }
+        $ret = system "$command | tee .stdout-$$;" . ' test ${PIPESTATUS[0]} -eq 0';
+    } elsif ($show_err) {
+        $ret = system "$command 2>&1 1>.stdout-$$ | tee .stderr-$$;" . ' test ${PIPESTATUS[0]} -eq 0';
+    } else {
+        $ret = system "$command 2>.stderr-$$ 1>.stdout-$$";
     }
-    my $out = `$command $err`;
-    my $ret = $?;
-    print $out if $verbose;
+    open $sto, ".stdout-$$";
+    $out = <$sto>;
+    close $sto;
+    open $ste, ".stderr-$$";
+    $out .= <$ste>;
+    close $ste;
     return ( $ret, $out );
 }
 
@@ -2682,6 +2694,7 @@ sub WARN {
 sub DIE {
     my $error = shift;
     LOG($error);
+    system "rm .stdout-$$ .stderr-$$ &>/dev/null";
     die( "\n", BOLD, RED, "Error: ", RESET, "$error\n\n" );
 }
 
