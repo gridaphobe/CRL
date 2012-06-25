@@ -82,7 +82,7 @@ my $ANONYMOUS_CHECKOUT = 1;
 my $DO_UPDATES         = 0;
 my $STATUS             = 0;
 my $DIFF               = 0;
-my $SHALLOW_CLONE      = -1;
+my $SHALLOW_CLONE      = 0;
 my $DATE;
 my @CRL_LISTS;
 my @ORIG_LISTS;
@@ -1334,10 +1334,8 @@ sub handle_git {
     my $target  = $component{"TARGET"};
     my $name    = $component{"NAME"};
     my $url     = $component{"URL"};
-    my $shallow = ' --depth 1';
     if ( defined( $component{"AUTH_URL"} ) ) {
         $url     = $component{"AUTH_URL"};
-        $shallow = '';
     }
     if    ( $SHALLOW_CLONE == 1 ) { $shallow = ' --depth 1' }
     elsif ( $SHALLOW_CLONE == 0 ) { $shallow = '' }
@@ -1905,10 +1903,8 @@ sub handle_darcs {
     my $target  = $component{"TARGET"};
     my $name    = $component{"NAME"};
     my $url     = $component{"URL"};
-    my $shallow = ' --lazy';
     if ( defined( $component{"AUTH_URL"} ) ) {
         $url     = $component{"AUTH_URL"};
-        $shallow = '';
     }
     if    ( $SHALLOW_CLONE == 1 ) { $shallow = ' --lazy' }
     elsif ( $SHALLOW_CLONE == 0 ) { $shallow = '' }
@@ -2783,7 +2779,7 @@ svn, and mercurial.
 
 Force GetComponents to add '--depth 1' to all 'git clone' commands. This will 
 reduce the size of all git repositories by ignoring the repository history. 
-The default is to add this tag for anonymous checkouts only.
+Equivalent options are used for darcs.
 
 =item B<--reset-authentication>
 
