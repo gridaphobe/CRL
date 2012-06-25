@@ -78,7 +78,7 @@ my $DEBUG              = 0;
 my $HELP               = 0;
 my $MAN                = 0;
 my $EXPERIMENTAL       = 0;
-my $ANONYMOUS_CHECKOUT = 0;
+my $ANONYMOUS_CHECKOUT = 1;
 my $DO_UPDATES         = 0;
 my $STATUS             = 0;
 my $DIFF               = 0;
@@ -138,7 +138,7 @@ GetOptions(
     'help|?'               => \$HELP,
     'man'                  => \$MAN,
     'debug'                => \$DEBUG,
-    'anonymous'            => \$ANONYMOUS_CHECKOUT,
+    'anonymous!'           => \$ANONYMOUS_CHECKOUT,
     'update'               => \$DO_UPDATES,
     'root=s'               => \$ROOT,
     'date=s'               => \$DATE,
