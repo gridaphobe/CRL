@@ -1337,6 +1337,7 @@ sub handle_git {
     if ( defined( $component{"AUTH_URL"} ) ) {
         $url     = $component{"AUTH_URL"};
     }
+    my $shallow;
     if    ( $SHALLOW_CLONE == 1 ) { $shallow = ' --depth 1' }
     elsif ( $SHALLOW_CLONE == 0 ) { $shallow = '' }
     my $checkout      = $component{"CHECKOUT"};
@@ -1906,6 +1907,7 @@ sub handle_darcs {
     if ( defined( $component{"AUTH_URL"} ) ) {
         $url     = $component{"AUTH_URL"};
     }
+    my $shallow;
     if    ( $SHALLOW_CLONE == 1 ) { $shallow = ' --lazy' }
     elsif ( $SHALLOW_CLONE == 0 ) { $shallow = '' }
     my $checkout        = $component{"CHECKOUT"};
