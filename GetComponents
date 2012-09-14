@@ -1289,7 +1289,7 @@ sub handle_svn {
 
     elsif ( $method eq 'authenticate' ) {
 
-        $cmd = "$svn info $user $url";
+        $cmd = "$svn info --non-interactive $user $url";
         $err = run_command($cmd);
 
         # store username and repo
@@ -1301,7 +1301,7 @@ sub handle_svn {
 
     elsif ( $method eq 'verify_url' ) {
         my $dir = defined($name) ? $name : $checkout;
-        my $cmd = "$svn info --xml $target/$dir";
+        my $cmd = "$svn info --non-interactive --xml $target/$dir";
 
         my $same_url;
         my $new_url = $url;
