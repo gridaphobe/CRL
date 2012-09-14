@@ -397,7 +397,10 @@ sub parse_list {
         my @pairs = split( /^\s*!([^\s=]+)\s*=\s*/m, $section );
         shift(@pairs);
 
-        #chomp @pairs;
+        for my $pairs (@pairs) {
+            $pairs =~ s/\s+$//;
+        }
+
         my %rec;
 
         # turn off warnings for this statement, we do our own checking
