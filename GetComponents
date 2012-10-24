@@ -1637,35 +1637,26 @@ sub handle_git {
 sub git_stash_update_repo {
     my ( $git_repo, $repo_loc, $checkout, @branches ) = @_;
     
-    # determine if we need to stash local changes
-    my ( $err, $out ) = run_command("cd $repo_loc && $git diff-files --quiet");
-    my $stash = $err;
-    if ($stash) {
-        # found local changes, stash them
-        my ( $err, $out ) = run_command("cd $repo_loc && $git stash");
-        if ($err) {
-            push( @components_error, $checkout );
-            my $logmsg = "Could not update $git_repo. "
-              . "Could not stash local changes.";
-            WARN($logmsg);
-            $updated_git_repos{$git_repo} = -1;
-            return $err;
-        }
+    # stash local changes, if necessary
+    my ( $err, $out ) = run_command("cd $repo_loc && $git stash save GetComponents-tmp");
+    if ($err) {
+        push( @components_error, $checkout );
+        my $logmsg = "Could not update $git_repo. Could not stash local changes. Error message was '$out'.";
+        WARN($logmsg);
+        $updated_git_repos{$git_repo} = -1;
+        return $err;
     }
 
     my $ret = git_update_repo($git_repo, $repo_loc, $checkout, @branches);
 
-    # now pop stash if necessary
-    if ($stash) {
-        ( $err, $out ) = run_command("cd $repo_loc && $git stash pop");
-        if ($err) {
-            push( @components_error, $checkout );
-            my $logmsg = "Could not update $git_repo. "
-              . "Could not pop stashed changes.";
-            WARN($logmsg);
-            $updated_git_repos{$git_repo} = -1;
-            return $err;
-        }
+    # pop stash if necessary
+    ( $err, $out ) = run_command("cd $repo_loc && if $git stash list | grep q GetComponents-tmp; then $git stash pop GetComponents-tmp; fi");
+    if ($err) {
+        push( @components_error, $checkout );
+        my $logmsg = "Could not update $git_repo. Could not pop stashed changes. Error message was '$out'.";
+        WARN($logmsg);
+        $updated_git_repos{$git_repo} = -1;
+        return $err;
     }
     return $ret;
 }
