@@ -1650,7 +1650,7 @@ sub git_stash_update_repo {
     my $ret = git_update_repo($git_repo, $repo_loc, $checkout, @branches);
 
     # pop stash if necessary
-    ( $err, $out ) = run_command("cd $repo_loc && if $git stash list | grep -q GetComponents-tmp; then $git stash pop $($git stash list | grep GetComponents-tmp | sed -e 's/:.*//'); fi");
+    ( $err, $out ) = run_command("cd $repo_loc && if $git stash list | grep -q GetComponents-tmp; then $git stash pop \$($git stash list | grep GetComponents-tmp | sed -e 's/:.*//'); fi");
     if ($err) {
         push( @components_error, $checkout );
         my $logmsg = "Could not update $git_repo. Could not pop stashed changes. Error message was '$out'.";
