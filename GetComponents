@@ -384,6 +384,7 @@ sub parse_list {
     # if $ROOT is undefined, it will be set to the current directory
     if   ( defined( $DEFINITIONS{ROOT} ) ) { $ROOT = $DEFINITIONS{ROOT} }
     else                                   { $ROOT = $orig_dir }
+    DIE("Target directory '$ROOT' exists and is not a directory") if (-e $ROOT and not -d $ROOT);
 
     my @sections = split( /^!TARGET\s*=\s*/m, $file );
     shift(@sections);
