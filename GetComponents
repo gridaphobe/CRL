@@ -1185,7 +1185,7 @@ sub handle_svn {
 
         run_command("mkdir -p $target");
         my $dir = defined($name) ? $name : $checkout;
-        $cmd = "cd $target && $svn checkout$user$date $url $dir";
+        $cmd = "cd $target && $svn checkout --non-interactive$user$date $url $dir";
 
         print_checkout_info( $checkout, $url, $target, $name );
 
@@ -1195,7 +1195,7 @@ sub handle_svn {
         # Check for relocated repositories
         if ($out =~ /^svn: Repository moved permanently to '(.*)'; please relocate$/) {
             my $new_location = $1;
-            $cmd = "cd $target && $svn checkout$user$date $new_location $dir";
+            $cmd = "cd $target && $svn checkout --non-interactive$user$date $new_location $dir";
             ( $err, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
         }
         if ( $err || $out =~ /^svn/gmi ) {
