@@ -2747,10 +2747,10 @@ Run checkout and update commands in parallel. Requires perl to be compiled with
 support for threads. 4 threads are used so as not to overload the network, this
 may become configurable in the future.
 
-=item B<--anonymous>
+=item B<--[no]anonymous>
 
 Override any stored login credentials and use anonymous checkouts for all 
-components.
+components (default). Use --noa[nonymous] for the opposite.
 
 =item B<--update>
 
