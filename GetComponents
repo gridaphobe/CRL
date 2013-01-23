@@ -785,7 +785,7 @@ sub verify_urls {
               ->( 'verify_url', %{$component} );
             if ( !$ret ) {
                 DIE(    "The URL for $component->{CHECKOUT} has changed, "
-                      . "please perform a clean checkout." );
+                      . "please perform a clean checkout ($component->{CHECKOUT} )." );
             }
         }
     }
