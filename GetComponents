@@ -846,8 +846,7 @@ sub process_users {
             and (  $component->{TYPE} eq 'cvs'
                 or $component->{TYPE} eq 'svn'
                 or $component->{TYPE} eq 'darcs'
-                or $component->{TYPE} eq 'git'
-                or $component->{TYPE} eq 'hg' )
+                or $component->{TYPE} eq 'git' )
           )
         {
 
