@@ -2512,6 +2512,14 @@ sub handle_hg {
         $updated_hg_repos{$hg_repo} = 1;
     }
 
+    elsif ( $method eq 'authenticate' ) {
+
+        # do something, nothing for now...
+        # hg authenticates through ssh, so no storing usernames and stuff yet
+        my $user = $component{USER};
+        save_user( $user, $component{AUTH_URL_ORIG} );
+    }
+
     elsif ( $method eq 'verify_url' ) {
 
         # only need to run once per repo
