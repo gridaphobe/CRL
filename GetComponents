@@ -1425,7 +1425,7 @@ sub handle_git {
                             return $err;
                         }
                     } elsif ( defined $tag ) {
-                        $cmd = "cd $repo_loc && $git checkout $tag";
+                        $cmd = "cd $repo_loc && $git checkout -b $tag origin/$tag";
                         my ( $err, $out ) = run_command($cmd);
                         if ($err) {
                             my $new;
@@ -1700,7 +1700,7 @@ sub git_update_repo {
             # checkout branch and pull --rebase
             ( $err, $out ) = run_command(
                             "cd $repo_loc && " .
-                            "$git checkout $branch && " .
+                            "$git checkout -b $branch origin/$branch && " .
                             "$git pull --rebase origin $branch");
             if ($err) {
                 push( @components_error, $checkout );
@@ -1727,7 +1727,7 @@ sub git_update_repo {
     }
     
     # now checkout original branch
-    ( $err, $out ) = run_command("cd $repo_loc && $git checkout $current_branch");
+    ( $err, $out ) = run_command("cd $repo_loc && $git checkout -b $current_branch origin/$current_branch");
     if ($err) {
         push( @components_error, $checkout );
         my $logmsg = "Could not update $git_repo. "
