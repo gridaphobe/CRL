@@ -171,14 +171,12 @@ verify_urls() if $DO_UPDATES;
 # start timer here, we don't care about authentication time
 my $start_time = time;
 
-foreach my $key ( sort {length($a)<=>length($b)} ( keys %components_to_checkout ) ) {
-    checkout( sort {length($a->{NAME}||$a->{CHECKOUT})<=>length($b->{NAME}||$b->{CHECKOUT})}
-                   @{ $components_to_checkout{$key} } );
+foreach my $key ( sort( keys %components_to_checkout ) ) {
+    checkout( @{ $components_to_checkout{$key} } );
 }
 if ($DO_UPDATES) {
-    foreach my $key ( sort {length($a)<=>length($b)} ( keys %components_to_update ) ) {
-        update( sort {length($a->{NAME}||$a->{CHECKOUT})<=>length($b->{NAME}||$b->{CHECKOUT})}
-                     @{ $components_to_update{$key} } );
+    foreach my $key ( sort( keys %components_to_update ) ) {
+        update( @{ $components_to_update{$key} } );
     }
 }
 
@@ -949,14 +947,9 @@ sub prompt_for_update {
 
 sub checkout {
     my @components : shared = @_;
-    if ($PARALLEL and scalar(@components) > 1) {
-        # checkout first component in serial, because this is likely to be a
-        # component containing other components, and parallel checkouts here
-        # might run into problems just because of that.
-        # This happens for instance with svn version 1.7 through 1.8
-        process_component( $components[0]->{TYPE}, 'checkout', %{$components[0]} );
+    if ($PARALLEL) {
         no warnings 'threads';
-        $QUEUE->enqueue(@components[1..$#components]);
+        $QUEUE->enqueue(@components);
         my $thr1 = threads->create( \&worker, 'checkout' );
         my $thr2 = threads->create( \&worker, 'checkout' );
         my $thr3 = threads->create( \&worker, 'checkout' );
@@ -975,13 +968,8 @@ sub checkout {
 sub update {
     my @components : shared = @_;
     if ($PARALLEL) {
-        # update first component in serial, because this is likely to be a
-        # component containing other components, and parallel updates here
-        # might run into problems just because of that.
-        # This happens for instance with svn version 1.7 through 1.8
-        process_component( $components[0]->{TYPE}, 'update', %{$components[0]} );
         no warnings 'threads';
-        $QUEUE->enqueue(@components[1..$#components]);
+        $QUEUE->enqueue(@components);
         my $thr1 = threads->create( \&worker, 'update' );
         my $thr2 = threads->create( \&worker, 'update' );
         my $thr3 = threads->create( \&worker, 'update' );
