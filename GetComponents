@@ -1626,9 +1626,10 @@ sub handle_git {
         
         my $cmd = "cd $repo_loc && git config --get remote.origin.url";
         my ( $err, $out ) = run_command($cmd);
+        chomp($out);
         $verified_git_repos{$git_repo} = 1;
         if (! ( $out =~ /$url/ )) {
-            WARN("git::verify_url: URLs do not match. Stored URL: <$url>$, current URL: <$out>");
+            WARN("git::verify_url: URLs do not match. Stored URL: <$url>, current URL: <$out>");
         }
         return ( $out =~ /$url/ );
     }
