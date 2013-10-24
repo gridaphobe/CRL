@@ -1713,7 +1713,9 @@ sub git_update_repo {
             # checkout branch and pull --rebase
             ( $err, $out ) = run_command(
                             "cd $repo_loc && " .
-                            "$git checkout -b $branch origin/$branch && " .
+                            "if [ xrefs/heads/$branch != x`$git symbolic-ref -q HEAD` ] ; then " .
+                            "  $git checkout $branch ; " .
+                            "fi && " .
                             "$git pull --rebase origin $branch");
             if ($err) {
                 push( @components_error, $checkout );
@@ -1739,8 +1741,12 @@ sub git_update_repo {
         } # no need for else statement, do nothing for tags
     }
     
-    # now checkout original branch
-    ( $err, $out ) = run_command("cd $repo_loc && $git checkout -b $current_branch origin/$current_branch");
+    # now checkout original branch if required
+    ( $err, $out ) = run_command(
+                "cd $repo_loc && " .
+                "if [ xrefs/heads/$current_branch != x`$git symbolic-ref -q HEAD` ] ; then " .
+                "  $git checkout $current_branch ; " .
+                "fi");
     if ($err) {
         push( @components_error, $checkout );
         my $logmsg = "Could not update $git_repo. "
