@@ -728,26 +728,21 @@ sub print_list {
     $|++;
     print $num_checkouts. " components will be checked out.\n";
     print $num_updates. " components will be updated.\n";
-    print "Would you like a detailed list? [yes no] ";
-    my $answer = <STDIN>;
     $|--;
-    if ( $answer =~ /y/ ) {
-        foreach my $group ( values %components_to_checkout ) {
-            foreach my $component ( @{$group} ) {
-                print "A    $component->{TARGET}/$component->{CHECKOUT}";
-                print "/$component->{NAME}" if defined $component->{NAME};
-                print "\n";
-            }
-        }
-        foreach my $group ( values %components_to_update ) {
-            foreach my $component ( @{$group} ) {
-                print "U    $component->{TARGET}/$component->{CHECKOUT}";
-                print "/$component->{NAME}" if defined $component->{NAME};
-                print "\n";
-            }
+    foreach my $group ( values %components_to_checkout ) {
+        foreach my $component ( @{$group} ) {
+            print "A    $component->{TARGET}/$component->{CHECKOUT}";
+            print "/$component->{NAME}" if defined $component->{NAME};
+            print "\n";
         }
     }
-    exit 0;
+    foreach my $group ( values %components_to_update ) {
+        foreach my $component ( @{$group} ) {
+            print "U    $component->{TARGET}/$component->{CHECKOUT}";
+            print "/$component->{NAME}" if defined $component->{NAME};
+            print "\n";
+        }
+    }
 }
 
 sub get_status {
@@ -2577,7 +2572,8 @@ sub run_command {
         }
         else { print BOLD, "Executing: ", RESET, "$command\n" }
     }
-    my $out = `$command $err`;
+    my $out = "";
+    if (not $DEBUG) { $out = `$command $err`; }
     my $ret = $?;
     print $out if $verbose;
     return ( $ret, $out );
