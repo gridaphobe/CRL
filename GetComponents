@@ -1335,7 +1335,8 @@ sub handle_svn {
         my $same_url;
         my $new_url = $url;
         $url =~ s!https?://!!;
-        my ( $err, $out ) = run_command($cmd);
+        my ( $err, $out ) = run_command($cmd, $VERBOSE, $bad_cert);
+        return 0 if $err;
         $out =~ m!<url>(.*)</url>!;
         my $old_url = $1;
         unless ($old_url =~ /$url/) {
