@@ -525,20 +525,6 @@ sub parse_list {
             else { $hg_found = 1 }
         }
         $|--;
-        # check for svn SSL problems
-        if ( $rec{"TYPE"} eq "svn" && defined $rec{"AUTH_URL"} ) {
-            my $base = $rec{"AUTH_URL"};
-            $base =~ s/(https\:\/\/[\w\.]+)\/(.*)$/$1/i;
-            unless ( defined $svn_servers{$base} ) {
-                my $ret = `$svn --non-interactive info $rec{AUTH_URL} 2>&1`;
-                if ( $ret =~ /Server certificate verification failed/ ) {
-                    $svn_servers{$base} = 0;
-                }
-                else {
-                    $svn_servers{$base} = 1;
-                }
-            }
-        }
 
         # save target in original form to check existence.
         my $target = $rec{"TARGET"};
@@ -551,6 +537,11 @@ sub parse_list {
         # save url in original form for parsing $1/$2
         $rec{"URL_ORIG"}      = $rec{"URL"};
         $rec{"AUTH_URL_ORIG"} = $rec{"AUTH_URL"};
+
+        # if $ANONYMOUS_CHECKOUT is set we override any stored users
+        if ($ANONYMOUS_CHECKOUT) {
+            delete $rec{AUTH_URL};
+        }
 
         # we are splitting each group of components into individuals
         # to check for existence. they will now be passed individually to
@@ -578,6 +569,34 @@ sub parse_list {
                 $rec{AUTH_URL} =~ s!\$1!$dir1!;
                 $rec{AUTH_URL} =~ s!\$2!$dir2!;
             }  
+
+            # check for svn SSL problems
+            # this needs to be done after all substitutions have been performed
+            if ( $rec{"TYPE"} eq "svn" ) {
+                my $url = ($rec{"AUTH_URL"} or $rec{"URL"});
+                if ( $url =~ m!https://! ) {
+                    my $base = $url;
+                    $base =~ s/(https\:\/\/[\w\.]+)\/(.*)$/$1/i;
+                    unless ( defined $svn_servers{$base} ) {
+                        my $ret = `$svn --non-interactive info $url 2>&1`;
+                        if ( $ret =~ /svn: E230001:/ ) {
+                            my $warning = $ret;
+                            my $ret_trust = `$svn --non-interactive --trust-server-cert info $url 2>&1`;
+                            if ( $ret_trust !~ /svn: E230001:/ ) {
+                                $warning .= "\nYour subversion client does not seem to handle server certificates correctly, or server $base does not supply a correct ssl certificate.";
+                                if ( $^O == "darwin" ) {
+                                    $warning .= "\nThe stock subversion client installed with some OSX is broken and cannot verify any certificates. Please install a version of subversion through either Homebrew or MacPorts and re-run GetComponents. You will not be able to use any subversion repositories until then.";
+                                }
+                            }
+                            WARN($warning);
+                            $svn_servers{$base} = 0;
+                        }
+                        else {
+                            $svn_servers{$base} = 1;
+                        }
+                    }
+                }
+            }
 
             # parse name of git repo
             if ( $rec{"TYPE"} eq "git" ) {
@@ -826,12 +845,6 @@ sub process_users {
         # is using the hash reference stored in @components directly.
         # we can't convert the reference back to a hash because that would
         # create a new hash not in the array...
-
-        # if $ANONYMOUS_CHECKOUT is set we override any stored users
-        if ($ANONYMOUS_CHECKOUT) {
-            delete $component->{AUTH_URL};
-            next;
-        }
 
         # if AUTH_URL is defined we want to find the username:
         if (
@@ -1177,6 +1190,9 @@ sub handle_svn {
     my $url      = $component{"URL"};
     if ( defined( $component{"AUTH_URL"} ) ) {
         $url = $component{"AUTH_URL"};
+    }
+    if ( $url =~ m!https://! )
+    {
         my $base = $url;
         $base =~ s!(https://[\w\.]+)/(.*)$!$1!i;
         unless ( $svn_servers{$base} ) {
