@@ -1194,11 +1194,17 @@ sub handle_svn {
         }
     }
 
+    # This should be removed as soon as those repos are moved
+    my $cert_hack = '';
+    if ( $url =~ /https:\/\/svn\.cct\.lsu\.edu/ ) {
+      $cert_hack = " --trust-server-cert ";
+    }
+
     if ( $method eq 'checkout' ) {
 
         run_command("mkdir -p $target");
         my $dir = defined($name) ? $name : $checkout;
-        $cmd = "cd $target && $svn checkout --non-interactive$user$date $url $dir";
+        $cmd = "cd $target && $svn checkout --non-interactive $cert_hack $user$date $url $dir";
 
         print_checkout_info( $checkout, $url, $target, $name );
 
@@ -1208,7 +1214,7 @@ sub handle_svn {
         # Check for relocated repositories
         if ($out =~ /^svn: Repository moved permanently to '(.*)'; please relocate$/) {
             my $new_location = $1;
-            $cmd = "cd $target && $svn checkout --non-interactive$user$date $new_location $dir";
+            $cmd = "cd $target && $svn checkout --non-interactive $cert_hack $user$date $new_location $dir";
             ( $err, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
         }
         if ( $err || $out =~ /^svn/gmi ) {
@@ -1225,14 +1231,14 @@ sub handle_svn {
     elsif ( $method eq 'update' ) {
 
         my $dir = defined($name) ? $name : $checkout;
-        $cmd = "cd $target/$dir && $svn update --non-interactive $date";
+        $cmd = "cd $target/$dir && $svn update --non-interactive $cert_hack $date";
 
         print_update_info( $checkout, $url, $target, $name );
         ( $err, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
         # Check for relocated repositories
         if ($out =~ /^svn: Repository moved permanently to '(.*)'; please relocate$/) {
             my $new_location = $1;
-            $cmd = "cd $target/$dir && $svn info --non-interactive";
+            $cmd = "cd $target/$dir && $svn info --non-interactive $cert_hack";
             ( $err, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
             $out =~ /^URL: (.*)$/m;
             my $old_location = $1;
@@ -1241,7 +1247,7 @@ sub handle_svn {
                      "trying relocation");
                 push( @components_error, $checkout );
             } else {
-                $cmd = "cd $target/$dir && $svn --non-interactive switch --relocate $old_location $new_location";
+                $cmd = "cd $target/$dir && $svn --non-interactive $cert_hack switch --relocate $old_location $new_location";
                 ( $err, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
                 if ( $err || $out =~ /^svn/gmi ) {
                     WARN("Could not relocate module $checkout");
@@ -1267,7 +1273,7 @@ sub handle_svn {
             $err = 1;
         }
         else {
-            $cmd = "cd $target/$dir && $svn status --non-interactive";
+            $cmd = "cd $target/$dir && $svn status --non-interactive $cert_hack ";
             ( $err, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
             if ($out =~ /^[CE]\s+/gm) {
                 my $log = "Module $checkout has conflicts, don't forget to resolve\n";
@@ -1328,10 +1334,10 @@ sub handle_svn {
         my $old_url = $1;
         unless ($old_url =~ /$url/) {
             # URL's don't match. try `svn switch`
-            ( $err, $out ) = run_command("$svn --non-interactive switch $new_url $target/$dir");
+            ( $err, $out ) = run_command("$svn --non-interactive $cert_hack switch $new_url $target/$dir");
             if ($err) {
                 # repo might have moved. try `svn switch --relocate`
-                ( $err, $out ) = run_command("$svn --non-interactive switch --relocate $old_url $new_url $target/$dir");
+                ( $err, $out ) = run_command("$svn --non-interactive $cert_hack switch --relocate $old_url $new_url $target/$dir");
                 if ($out =~ /^svn: Repository moved permanently to '(.*)'; please relocate$/) {
                     my $new_location = $1;
                     if ($new_location eq $old_url) { $err = 0; }
