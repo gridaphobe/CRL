@@ -329,6 +329,9 @@ sub parse_list {
                 # don't set ROOT if already given on the command line
                 next if $def eq 'ROOT' && $ROOT ne '';
 
+                # resolve compound definitions
+                $value =~ s/\$(\w+)/$DEFINITIONS{$1}/;
+
                 # check for repeated definitions
                 if ( defined( $DEFINITIONS{$def} )
                     and $DEFINITIONS{$def} ne $value )
@@ -337,14 +340,11 @@ sub parse_list {
                         WARN("Repeated definition of $def on line $line_nr, ignored");
                     }
                     else {
+                        print ">$DEFINITIONS{$def}< >$value<\n";
                         DIE("Repeated definition of $def on line $line_nr");
                     }
                 }
                 else {
-
-                    # resolve compound definitions
-                    $value =~ s/\$(\w+)/$DEFINITIONS{$1}/;
-
                     $DEFINITIONS{$def} = $value;
                 }
             }
