@@ -2550,8 +2550,9 @@ sub handle_hg {
         $verified_hg_repos{$hg_repo} = 1;
         # match against either anonymous or authenticated URL, assuming
         # both point to actually the same repository
-        $url = "(".$component{"URL"}.")|(".$component{"AUTH_URL"}.")";
-        return ( $out =~ /$url/ );
+        return ( $out =~ /$component{"URL"}/ or
+                 (defined $component{"AUTH_URL"} and
+                  $out =~ /$component{"AUTH_URL"}/) );
     }
 
     else { DIE("Unrecognized checkout method: $method") }
