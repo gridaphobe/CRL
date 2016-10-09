@@ -219,7 +219,7 @@ sub download_list {
     my $file = $url;
     $file =~ s!.*/!!;
     if ($curl_found) {
-        system("$curl --silent '$url' -o $file") == 0 and return;
+        system("$curl --location --silent '$url' -o $file") == 0 and return;
     }
     system("$wget --quiet '$url' -O $file") == 0 and return;
     DIE("Couldn't download $url correctly.");
@@ -254,7 +254,7 @@ sub download_include {
         unlink("$crl_dir/include_tmp");
     }
     if ((   !$curl_found
-         or (run_command("$curl '$url' -o $crl_dir/include_tmp"))[0])
+         or (run_command("$curl --location '$url' -o $crl_dir/include_tmp"))[0])
         and (run_command("$wget '$url' -O $crl_dir/include_tmp"))[0] )
     {
         DIE("Couldn't download include url $url correctly\n");
@@ -1794,12 +1794,12 @@ sub handle_curl {
             $cmd = "{ "
               . "rm -rf $tmpdir && "
               . "mkdir $tmpdir && "
-              . "(cd $tmpdir && $curl -O $user $url/$checkout) && "
+              . "(cd $tmpdir && $curl --location -O $user $url/$checkout) && "
               . "mv $tmpdir/$checkout $target/$name &&"
               . "rmdir $tmpdir; " . "}";
         }
         else {
-            $cmd = "cd $target && $curl -O $user $url/$checkout";
+            $cmd = "cd $target && $curl --location -O $user --location $url/$checkout";
         }
         print_checkout_info( $checkout, $url, $target, $name );
         my ( $err, $out ) = run_command($cmd);
@@ -1822,12 +1822,12 @@ sub handle_curl {
               . "rm -rf $tmpdir && "
               . "mkdir $tmpdir && "
               . "mv $name $tmpdir/$checkout && "
-              . "(cd $tmpdir && $curl -O $user $url/$checkout) && "
+              . "(cd $tmpdir && $curl --location -O $user $url/$checkout) && "
               . "mv $tmpdir/$checkout $target/$name &&"
               . "rmdir $tmpdir; " . "}";
         }
         else {
-            $cmd = "cd $target && $curl -O $user $url/$checkout";
+            $cmd = "cd $target && $curl --location -O $user --location $url/$checkout";
         }
 
         # add modification timestamp to old version
