@@ -331,12 +331,8 @@ sub parse_list {
                 last;
             }
             if (m/\w/) {
-                $|++;
-                print "$LIST is not a CRL file.\n";
-                print "Do you want to continue? yes no [no]: ";
-                my $answer = <STDIN>;
-                chomp $answer;
-                $|--;
+                my $answer = QUERY("$LIST is not a CRL file.\n"
+                                   ."Do you want to continue? yes no [no]: ");
                 exit unless $answer =~ /^y/;
                 last;
             }
@@ -480,11 +476,9 @@ sub parse_list {
             else { $cvs_found = 1 }
         }
         if ( ( $rec{"TYPE"} eq "svn" ) && ( !$svn_found ) ) {
-            print "You have requested a subversion checkout, "
-              . "but the system was unable to find subversion.\n";
-            print "Please enter the path to subversion: ";
-            $svn = <STDIN>;
-            chomp $svn;
+            $svn = QUERY("You have requested a subversion checkout, "
+                       . "but the system was unable to find subversion.\n"
+                       . "Please enter the path to subversion: ");
 
             # verify that we actually have svn now...
             my $ret = system "$svn --version >/dev/null 2>&1";
@@ -494,11 +488,9 @@ sub parse_list {
             else { $svn_found = 1 }
         }
         if ( ( $rec{"TYPE"} eq "git" ) && ( !$git_found ) ) {
-            print "You have requested a git checkout, "
-              . "but the system was unable to find git.\n";
-            print "Please enter the path to git: ";
-            $git = <STDIN>;
-            chomp $git;
+            $git = QUERY("You have requested a git checkout, "
+                       . "but the system was unable to find git.\n"
+                       . "Please enter the path to git: ");
 
             # verify that we actually have git now...
             my $ret = system "$git --version >/dev/null 2>&1";
@@ -510,12 +502,10 @@ sub parse_list {
         if ( ( $rec{"TYPE"} eq ( "http" or "https" ) )
             && !( $wget_found || $curl_found ) )
         {
-            print "You have requested an $rec{TYPE} checkout, "
-              . "but the system was unable to find curl or wget.\n";
-            print "Please enter the path to curl or wget: ";
-            my $path = <STDIN>;
-            chomp $path;
-            if ( $path =~ m/curl/ ) {
+            my $path = QUERY("You have requested an $rec{TYPE} checkout, "
+                           . "but the system was unable to find curl or wget.\n"
+                           . "Please enter the path to curl or wget: ");
+            if ( $path =~ /curl/ ) {
                 $curl = $path;
 
                 # verify that we actually have curl now...
@@ -537,11 +527,9 @@ sub parse_list {
             }
         }
         if ( ( $rec{"TYPE"} eq "darcs" ) && ( !$darcs_found ) ) {
-            print "You have requested a darcs checkout, "
-              . "but the system was unable to find darcs.\n";
-            print "Please enter the path to darcs: ";
-            $darcs = <STDIN>;
-            chomp $darcs;
+            $darcs = QUERY("You have requested a darcs checkout, "
+                         . "but the system was unable to find darcs.\n"
+                         . "Please enter the path to darcs: ");
 
             # verify that we actually have darcs now...
             my $ret = system "$darcs --version >/dev/null 2>&1";
@@ -551,11 +539,9 @@ sub parse_list {
             else { $darcs_found = 1 }
         }
         if ( ( $rec{"TYPE"} eq "hg" ) && ( !$hg_found ) ) {
-            print "You have requested an hg checkout, "
-              . "but the system was unable to find hg.\n";
-            print "Please enter the path to hg: ";
-            $hg = <STDIN>;
-            chomp $hg;
+            $hg = QUERY("You have requested an hg checkout, "
+                      . "but the system was unable to find hg.\n"
+                      . "Please enter the path to hg: ");
 
             # verify that we actually have hg now...
             my $ret = system "$hg --version >/dev/null 2>&1";
@@ -923,13 +909,10 @@ sub process_users {
                 if ( $component->{AUTH_URL} =~ /([^\/]+)@/ ) {
                     $user = $1;
                 }
-                $|++;
-                print "No user found for $component->{AUTH_URL_ORIG}\n";
-                print "Please enter your username ('-' for anonymous access) "
-                  . "[$user]: ";
-                my $answer = <STDIN>;
-                chomp $answer;
-                $|--;
+                my $answer =
+                    QUERY("No user found for $component->{AUTH_URL_ORIG}\n"
+                        . "Please enter your username ('-' for anonymous "
+                        . "access) [$user]: ");
 
                 # we want to save that the user wants to use anonymous access
                 if ( $answer =~ /^-$/ ) {
@@ -1000,19 +983,15 @@ sub prompt_for_update {
 
     # if there are no components to update there's no reason to ask..
     return unless scalar( values %components_to_update );
-    $|++;
     my $answer="no";
     # If this is a terminal, and if we are not running inside a
     # Jupyter notebook, prompt for input. Otherwise, use the default.
     if(-t STDIN and !defined($ENV{JPY_PARENT_PID})) {
-      print "Do you want to update all existing components? yes, no [$answer] : ";
-      $answer = <STDIN>;
-      chomp $answer;
+        $answer = QUERY("Do you want to update all existing components? yes, no [no] : ");
     } else {
-      print "Not updating existing components. If you want an update, re-run with --update\n";
+        print "Not updating existing components. If you want an update, re-run with --update\n";
     }
-    $|--;
-    $DO_UPDATES = 1 if ( $answer =~ /^[yY]/ );
+    $DO_UPDATES = 1 if ( $answer =~ /^y/ );
 }
 
 sub process_components {
@@ -2711,6 +2690,19 @@ sub filter_status_output {
     chomp $output;
     return $output;
 }
+
+sub QUERY {
+    # ask the user a question and report the answer. We accept a list of prompt
+    # strings which are concatenated and printed to <STDOUT>.
+    my (@prompt) = (@_);
+    $|++;
+    print @prompt;
+    my $answer = <STDIN>;
+    chomp $answer;
+    $|--;
+    return $answer;
+}
+
 sub LOG {
     return if $DEBUG;
 
