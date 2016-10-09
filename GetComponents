@@ -127,7 +127,7 @@ if ( defined( $ENV{HOME} ) ) {
     $crl_dir = "$ENV{HOME}/.crl";
 }
 else {
-    print "Home directory is not set. CRL files will be stored in .crl\n";
+    WARN("Home directory is not set. CRL files will be stored in .crl");
 }
 if ( !-e "$crl_dir" ) {
     run_command("mkdir '$crl_dir'");
@@ -321,7 +321,7 @@ sub parse_list {
             next if m/^#|^\s*$/;
             if (m/^!CRL_VERSION .*_experimental/) {
                 $EXPERIMENTAL = 1;
-                print "Using experimental features, be careful!\n";
+                WARN("Using experimental features, be careful!");
             }
             if (m/^!CRL_VERSION/) {
 
@@ -461,9 +461,8 @@ sub parse_list {
 
         # make sure the user has all the required tools
         if ( !defined( $rec{"TYPE"} ) ) {
-            print "Something is missing in the following section:\n";
-            print Dumper %rec;
-            die();
+            DIE(  "Something is missing in the following section:\n"
+                . Dumper(%rec));
         }
         $|++;
         if ( ( $rec{"TYPE"} eq "cvs" ) && ( !$cvs_found ) ) {
