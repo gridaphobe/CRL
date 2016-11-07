@@ -38,7 +38,6 @@ use Data::Dumper;
 use Getopt::Long;
 use Pod::Usage;
 use File::stat;
-use Cwd;
 use Term::ANSIColor qw(:constants);
 use POSIX qw(strftime);
 
@@ -157,7 +156,6 @@ find_tools();
 &process_args();
 
 # grab the directory the script was called from, we will need this later
-my $orig_dir = cwd();
 if ( $ROOT ne '' ) { $DEFINITIONS{ROOT} = $ROOT }
 
 parse_list();
@@ -385,7 +383,7 @@ sub parse_list {
     }
     # if $ROOT is undefined, it will be set to the current directory
     if   ( defined( $DEFINITIONS{ROOT} ) ) { $ROOT = $DEFINITIONS{ROOT} }
-    else                                   { $ROOT = $orig_dir }
+    else                                   { $ROOT = "." }
     DIE("Target directory '$ROOT' exists and is not a directory") if (-e $ROOT and not -d $ROOT);
 
     my @sections = split( /^!TARGET\s*=\s*/m, $file );
@@ -789,8 +787,6 @@ sub verify_urls {
 }
 
 sub write_componentlist_target {
-    chdir($orig_dir);
-
     # find directory to put file into
     my $fn = $ROOT;
     if ( defined( $DEFINITIONS{"COMPONENTLIST_TARGET"} ) ) {
@@ -1004,7 +1000,6 @@ sub process_component {
     if ( !exists( $checkout_types{$type} ) ) {
         DIE("Unrecognized checkout type: $type");
     }
-    chdir($orig_dir);
     my $err = $checkout_types{$type}->( $method, %component );
 
     # increment the checkout or update counter
@@ -1367,7 +1362,7 @@ sub handle_git {
                     split ", ", $component{REPO_BRANCH} : ();
     my $branch;
     my $tag;
-    my $repo_loc = "$orig_dir/$ROOT/repos/$git_repo";
+    my $repo_loc = "$ROOT/repos/$git_repo";
     
     if ( $method eq 'checkout' ) {
 
@@ -1376,7 +1371,7 @@ sub handle_git {
         }
         print_checkout_info( $checkout, $url, $target, $name );
 
-        run_command("mkdir -p $orig_dir/$ROOT/repos");
+        run_command("mkdir -p $ROOT/repos");
 
         # first check to see if previous attempt at clone failed
         if ( $updated_git_repos{$git_repo} == -1 ) {
@@ -1482,16 +1477,12 @@ sub handle_git {
             $checkout_item = $checkout;
         }
 
-        my $target_dir = "$orig_dir/$target/$checkout_dir";
-        # $target could be absolute path already...
-        if ($target =~ m!^/!) {
-            $target_dir = "$target/$checkout_dir"
-        }
+        my $target_dir = "$target/$checkout_dir";
         run_command("mkdir -p $target_dir");
 
         # get relative path from target directory to directory containing the
         # repositories
-        $git_repos_dir = File::Spec->abs2rel( "$orig_dir/$ROOT/repos",
+        $git_repos_dir = File::Spec->abs2rel( "$ROOT/repos",
             "$target_dir" );
 
         # now we create a symlink from the repo to the appropriate target
@@ -1504,14 +1495,12 @@ sub handle_git {
 
                 $cmd = "cd $target_dir && "
                   . "$ln $git_repos_dir/$git_repo/$repo_path $checkout_item";
-                if ( $orig_dir eq $ROOT ) { $cmd =~ s!$orig_dir/!! }
             }
             else {
                 $cmd =
                     "cd $target_dir && "
                   . "$ln $git_repos_dir/$git_repo/$repo_path/$checkout "
                   . "$checkout_item";
-                if ( $orig_dir eq $ROOT ) { $cmd =~ s!$orig_dir/!! }
             }
 
             #return if (-e "$checkout_item");
@@ -1528,7 +1517,6 @@ sub handle_git {
 
             # checkout entire repo
             $cmd = "cd $target_dir && $ln $git_repos_dir/$git_repo $name";
-            if ( $orig_dir eq $ROOT ) { $cmd =~ s!$orig_dir/!! }
             return if ( -e "$target_dir/$name" );
             my ( $err, $out ) = run_command($cmd);
             if ($err) {
@@ -1542,7 +1530,6 @@ sub handle_git {
         else {
             $cmd = "cd $target_dir && "
               . "$ln $git_repos_dir/$git_repo/$checkout $checkout_item";
-            if ( $orig_dir eq $ROOT ) { $cmd =~ s!$orig_dir/!! }
             return if ( -e "$target_dir/$checkout_item" );
             my ( $err, $out ) = run_command($cmd);
             if ($err) {
@@ -1565,11 +1552,11 @@ sub handle_git {
                 $semaphores{$git_repo}->down();
             }
 
-            if (  !-e "$orig_dir/$ROOT/repos/$git_repo"
-                && -e "$orig_dir/$ROOT/git-repos/$git_repo" )
+            if (  !-e "$ROOT/repos/$git_repo"
+                && -e "$ROOT/git-repos/$git_repo" )
             {
-                run_command("mkdir -p $orig_dir/$ROOT/repos");
-                run_command( "cd $orig_dir/$ROOT/repos && "
+                run_command("mkdir -p $ROOT/repos");
+                run_command( "cd $ROOT/repos && "
                       . "$ln ../git-repos/$git_repo $git_repo" );
             }
             print_update_info( $checkout, $url, $target, $name );
@@ -1937,7 +1924,7 @@ sub handle_darcs {
     my $tag = defined( $component{REPO_BRANCH} ) ? 
                 " -t $component{REPO_BRANCH}" : '';
 
-    my $repo_loc = "$orig_dir/$ROOT/repos/$darcs_repo";
+    my $repo_loc = "$ROOT/repos/$darcs_repo";
 
     if ( $method eq 'checkout' ) {
 
@@ -1945,7 +1932,7 @@ sub handle_darcs {
             $semaphores{$darcs_repo}->down();
         }
 
-        run_command("mkdir -p $orig_dir/$ROOT/repos");
+        run_command("mkdir -p $ROOT/repos");
 
         # first check to see if previous attempt at clone failed
         if ( $updated_darcs_repos{$darcs_repo} == -1 ) {
@@ -2001,16 +1988,12 @@ sub handle_darcs {
             $checkout_item = $checkout;
         }
 
-        my $target_dir = "$orig_dir/$target/$checkout_dir";
-        # $target could be absolute path
-        if ($target =~ m!^/!) {
-            $target_dir = "$target/$checkout_dir"
-        }
+        my $target_dir = "$target/$checkout_dir";
         run_command("mkdir -p $target_dir");
 
         # get relative path from target directory to directory containing the
         # repositories
-        $darcs_repos_dir = File::Spec->abs2rel( "$orig_dir/$ROOT/repos",
+        $darcs_repos_dir = File::Spec->abs2rel( "$ROOT/repos",
             "$target_dir" );
 
         # now we create a symlink from the repo to the appropriate target
@@ -2023,14 +2006,12 @@ sub handle_darcs {
 
                 $cmd = "cd $target_dir && "
                   . "$ln $darcs_repos_dir/$darcs_repo/$repo_path $checkout_item";
-                if ( $orig_dir eq $ROOT ) { $cmd =~ s!$orig_dir/!! }
             }
             else {
                 $cmd =
                     "cd $target_dir && "
                   . "$ln $darcs_repos_dir/$darcs_repo/$repo_path/$checkout "
                   . "$checkout_item";
-                if ( $orig_dir eq $ROOT ) { $cmd =~ s!$orig_dir/!! }
             }
 
             my ( $err, $out ) = run_command($cmd);
@@ -2048,7 +2029,6 @@ sub handle_darcs {
             # checkout entire repo
             $cmd =
               "cd $target_dir && " . "$ln $darcs_repos_dir/$darcs_repo $name";
-            if ( $orig_dir eq $ROOT ) { $cmd =~ s!$orig_dir/!! }
             return if ( -e "$target_dir/$name" );
             my ( $err, $out ) = run_command($cmd);
             if ($err) {
@@ -2063,7 +2043,6 @@ sub handle_darcs {
         else {
             $cmd = "cd $target_dir && "
               . "$ln $darcs_repos_dir/$darcs_repo/$checkout $checkout_item";
-            if ( $orig_dir eq $ROOT ) { $cmd =~ s!$orig_dir/!! }
             return if ( -e "$target_dir/$checkout_item" );
             my ( $err, $out ) = run_command($cmd);
             if ($err) {
@@ -2082,11 +2061,11 @@ sub handle_darcs {
             if ($PARALLEL) {
                 $semaphores{$darcs_repo}->down();
             }
-            if (  !-e "$orig_dir/$ROOT/repos/$darcs_repo"
-                && -e "$orig_dir/$ROOT/darcs-repos/$darcs_repo" )
+            if (  !-e "$ROOT/repos/$darcs_repo"
+                && -e "$ROOT/darcs-repos/$darcs_repo" )
             {
-                run_command("mkdir -p $orig_dir/$ROOT/repos");
-                run_command( "cd $orig_dir/$ROOT/repos && "
+                run_command("mkdir -p $ROOT/repos");
+                run_command( "cd $ROOT/repos && "
                       . "$ln ../darcs-repos/$darcs_repo $darcs_repo" );
             }
 
@@ -2271,14 +2250,14 @@ sub handle_hg {
       defined( $component{REPO_BRANCH} ) ? $component{REPO_BRANCH} : undef;
     my $date = defined $DATE ? '-d ' . $DATE : undef;
 
-    my $repo_loc = "$orig_dir/$ROOT/repos/$hg_repo";
+    my $repo_loc = "$ROOT/repos/$hg_repo";
 
     if ( $method eq 'checkout' ) {
         if ($PARALLEL) {
             $semaphores{$hg_repo}->down();
         }
 
-        run_command("mkdir -p $orig_dir/$ROOT/repos");
+        run_command("mkdir -p $ROOT/repos");
 
         # first check to see if previous attempt at clone failed
         if ( $updated_hg_repos{$hg_repo} == -1 ) {
@@ -2386,16 +2365,12 @@ sub handle_hg {
             $checkout_item = $checkout;
         }
 
-        my $target_dir = "$orig_dir/$target/$checkout_dir";
-        # $target could be absolute path
-        if ($target =~ m!^/!) {
-            $target_dir = "$target/$checkout_dir"
-        }
+        my $target_dir = "$target/$checkout_dir";
         run_command("mkdir -p $target_dir");
 
         # get relative path from target directory to directory containing the
         # repositories
-        $hg_repos_dir = File::Spec->abs2rel( "$orig_dir/$ROOT/repos",
+        $hg_repos_dir = File::Spec->abs2rel( "$ROOT/repos",
             "$target_dir" );
 
         # now we create a symlink from the repo to the appropriate target
@@ -2408,14 +2383,12 @@ sub handle_hg {
 
                 $cmd = "cd $target_dir && "
                   . "$ln $hg_repos_dir/$hg_repo/$repo_path $checkout_item";
-                if ( $orig_dir eq $ROOT ) { $cmd =~ s!$orig_dir/!! }
             }
             else {
                 $cmd =
                     "cd $target_dir && "
                   . "$ln $hg_repos_dir/$hg_repo/$repo_path/$checkout "
                   . "$checkout_item";
-                if ( $orig_dir eq $ROOT ) { $cmd =~ s!$orig_dir/!! }
             }
 
             my ( $err, $out ) = run_command($cmd);
@@ -2432,7 +2405,6 @@ sub handle_hg {
 
             # checkout entire repo
             $cmd = "cd $target_dir && " . "$ln $hg_repos_dir/$hg_repo $name";
-            if ( $orig_dir eq $ROOT ) { $cmd =~ s!$orig_dir/!! }
             my ($err, $out) = (0, "");
             if ( not -e "$target_dir/$name" ) {
                 ( $err, $out ) = run_command($cmd);
@@ -2448,7 +2420,6 @@ sub handle_hg {
         else {
             $cmd = "cd $target_dir && "
               . "$ln $hg_repos_dir/$hg_repo/$checkout $checkout_item";
-            if ( $orig_dir eq $ROOT ) { $cmd =~ s!$orig_dir/!! }
             my ($err, $out) = (0, "");
             if ( not -e "$target_dir/$checkout_item" ) {
                 ( $err, $out ) = run_command($cmd);
@@ -2468,11 +2439,11 @@ sub handle_hg {
             if ($PARALLEL) {
                 $semaphores{$hg_repo}->down();
             }
-            if (  !-e "$orig_dir/$ROOT/repos/$hg_repo"
-                && -e "$orig_dir/$ROOT/hg-repos/$hg_repo" )
+            if (  !-e "$ROOT/repos/$hg_repo"
+                && -e "$ROOT/hg-repos/$hg_repo" )
             {
-                run_command("mkdir -p $orig_dir/$ROOT/repos");
-                run_command( "cd $orig_dir/$ROOT/repos && "
+                run_command("mkdir -p $ROOT/repos");
+                run_command( "cd $ROOT/repos && "
                       . "$ln ../hg-repos/$hg_repo $hg_repo" );
             }
 
