@@ -2498,6 +2498,11 @@ sub run_command {
     return ( $ret, $out );
 }
 
+sub info {
+    my $text = shift;
+    if ($VERBOSE) { print $text}
+}
+
 sub print_checkout_info {
     return if $DEBUG;
 
