@@ -219,7 +219,7 @@ sub download_list {
     my $file = $url;
     $file =~ s!.*/!!;
     if ($curl_found) {
-        system("$curl --location --silent '$url' -o $file") == 0 and return;
+        system("$curl --silent '$url' -o $file") == 0 and return;
     }
     system("$wget --quiet '$url' -O $file") == 0 and return;
     DIE("Couldn't download $url correctly.");
@@ -1782,7 +1782,7 @@ sub handle_curl {
               . "rmdir $tmpdir; " . "}";
         }
         else {
-            $cmd = "cd $target && $curl -O $user --location $url/$checkout";
+            $cmd = "cd $target && $curl -O $user $url/$checkout";
         }
         print_checkout_info( $checkout, $url, $target, $name );
         my ( $err, $out ) = run_command($cmd);
@@ -1810,7 +1810,7 @@ sub handle_curl {
               . "rmdir $tmpdir; " . "}";
         }
         else {
-            $cmd = "cd $target && $curl -O $user --location $url/$checkout";
+            $cmd = "cd $target && $curl -O $user $url/$checkout";
         }
 
         # add modification timestamp to old version
