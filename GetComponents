@@ -608,10 +608,20 @@ sub parse_list {
             }
             $rec{URL} = $rec{"URL_ORIG"};
             $rec{URL} =~ s!\$1!$dir1!;
-            $rec{URL} =~ s!\$2!$dir2!;
+            if($rec{URL} =~ m!\$2! and not defined($dir2)) {
+                WARN("Could not replace \$2 in $rec{URL} using $checkout");
+                $rec{URL} =~ s!\$2!!; # for thornlists that expect this
+            } else {
+                $rec{URL} =~ s!\$2!$dir2!;
+            }
             $rec{AUTH_URL} = $rec{"AUTH_URL_ORIG"};
             $rec{AUTH_URL} =~ s!\$1!$dir1!;
-            $rec{AUTH_URL} =~ s!\$2!$dir2!;
+            if($rec{AUTH_URL} =~ m!\$2! and not defined($dir2)) {
+                WARN("Could not replace \$2 in $rec{AUTH_URL} using $checkout");
+                $rec{AUTH_URL} =~ s!\$2!!; # for thornlists that expect this
+            } else {
+                $rec{AUTH_URL} =~ s!\$2!$dir2!;
+            }
 
             # check for svn SSL problems
             # this needs to be done after all substitutions have been performed
@@ -654,7 +664,13 @@ sub parse_list {
                 }
                 $rec{"REPO"} = $git_repo;
                 $rec{"REPO"} =~ s!\$1!$dir1!;
-                $rec{"REPO"} =~ s!\$2!$dir2!;
+                if($rec{REPO} =~ m!\$2! and not defined($dir2)) {
+                    WARN("Could not replace \$2 in $rec{REPO} using " .
+                         $checkout);
+                    $rec{REPO} =~ s!\$2!!; # for thornlists that expect this
+                } else {
+                    $rec{"REPO"} =~ s!\$2!$dir2!;
+                }
                 
                 # add the repo to %updated_git_repos and set it to 0
                 # we will use this to track which repos have already been cloned
@@ -678,7 +694,13 @@ sub parse_list {
                 }
                 $rec{"REPO"} = $darcs_repo;
                 $rec{"REPO"} =~ s!\$1!$dir1!;
-                $rec{"REPO"} =~ s!\$2!$dir2!;
+                if($rec{REPO} =~ m!\$2! and not defined($dir2)) {
+                    WARN("Could not replace \$2 in $rec{REPO} using " .
+                         $checkout);
+                   $rec{REPO} =~ s!\$2!!; # for thornlists that expect this
+                } else {
+                    $rec{"REPO"} =~ s!\$2!$dir2!;
+                }
                 
                 # add the repo to %updated_darcs_repos and set it to 0
                 # we will use this to track which repos have already been cloned
@@ -703,7 +725,13 @@ sub parse_list {
                 }
                 $rec{"REPO"} = $hg_repo;
                 $rec{"REPO"} =~ s!\$1!$dir1!;
-                $rec{"REPO"} =~ s!\$2!$dir2!;
+                if($rec{REPO} =~ m!\$2! and not defined($dir2)) {
+                    WARN("Could not replace \$2 in $rec{REPO} using " .
+                         $checkout);
+                    $rec{REPO} =~ s!\$2!!; # for thornlists that expect this
+                } else {
+                    $rec{"REPO"} =~ s!\$2!$dir2!;
+                }
                 
                 # add the repo to %updated_hg_repos and set it to 0
                 # we will use this to track which repos have already been cloned
@@ -1615,7 +1643,12 @@ sub handle_git {
 
                 my ( $dir1, $dir2 ) = $checkout =~ m!(.*)/(.*)!;
                 $repo_path =~ s!\$1!$dir1!;
-                $repo_path =~ s!\$2!$dir2!;
+                if($repo_path =~ m!\$2! and not defined($dir2)) {
+                    WARN("Could not replace \$2 in $repo_path using $checkout");
+                    $repo_path =~ s!\$2!!;
+                } else {
+                    $repo_path =~ s!\$2!$dir2!;
+                }
 
                 $cmd = "cd '$target_dir' && "
                   . "$ln '$git_repos_dir/$git_repo/$repo_path' '$checkout_item'";
@@ -2083,7 +2116,12 @@ sub handle_darcs {
 
                 my ( $dir1, $dir2 ) = $checkout =~ m!(.*)/(.*)!;
                 $repo_path =~ s!\$1!$dir1!;
-                $repo_path =~ s!\$2!$dir2!;
+                if($repo_path =~ m!\$2! and not defined($dir2)) {
+                    WARN("Could not replace \$2 in $repo_path using $checkout");
+                    $repo_path =~ s!\$2!!;
+                } else {
+                    $repo_path =~ s!\$2!$dir2!;
+                }
 
                 $cmd = "cd '$target_dir' && "
                   . "$ln '$darcs_repos_dir/$darcs_repo/$repo_path' '$checkout_item'";
@@ -2452,7 +2490,12 @@ sub handle_hg {
 
                 my ( $dir1, $dir2 ) = $checkout =~ m!(.*)/(.*)!;
                 $repo_path =~ s!\$1!$dir1!;
-                $repo_path =~ s!\$2!$dir2!;
+                if($repo_path =~ m!\$2! and not defined($dir2)) {
+                    WARN("Could not replace \$2 in $repo_path using $checkout");
+                    $repo_path =~ s!\$2!!;
+                } else {
+                    $repo_path =~ s!\$2!$dir2!;
+                }
 
                 $cmd = "cd '$target_dir' && "
                   . "$ln $hg_repos_dir/$hg_repo/$repo_path $checkout_item";
