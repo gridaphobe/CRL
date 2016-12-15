@@ -937,7 +937,6 @@ sub process_users {
                 # we want to save that the user wants to use anonymous access
                 if ( $answer =~ /^-$/ ) {
                     save_user( 'N/A', $component->{AUTH_URL_ORIG} );
-                    delete $component->{AUTH_URL_ORIG};
                     delete $component->{AUTH_URL};
                     next;
                 }
@@ -959,7 +958,6 @@ sub process_users {
 
             # check for specified anonymous access
             elsif ( $saved_user eq 'N/A' ) {
-                delete $component->{AUTH_URL_ORIG};
                 delete $component->{AUTH_URL};
                 next;
             }
