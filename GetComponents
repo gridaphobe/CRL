@@ -582,6 +582,8 @@ sub parse_list {
         # save url in original form for parsing $1/$2
         $rec{"URL_ORIG"}      = $rec{"URL"};
         $rec{"AUTH_URL_ORIG"} = $rec{"AUTH_URL"};
+        delete $rec{"URL"};
+        delete $rec{"AUTH_URL"};
 
         # if $ANONYMOUS_CHECKOUT is set we override any stored users
         if ($ANONYMOUS_CHECKOUT) {
