@@ -574,6 +574,10 @@ sub parse_list {
         if ( defined( $rec{"URL"} ) and !defined( $rec{"AUTH_URL"} ) ) {
             $rec{"AUTH_URL"} = $rec{"URL"};
         }
+        # If URL is not defined, use AUTH_URL instead
+        if ( defined( $rec{"AUTH_URL"} ) and !defined( $rec{"URL"} ) ) {
+            $rec{"URL"} = $rec{"AUTH_URL"};
+        }
 
         # save url in original form for parsing $1/$2
         $rec{"URL_ORIG"}      = $rec{"URL"};
@@ -600,16 +604,12 @@ sub parse_list {
             else {
                 $dir1 = $checkout;
             }
-            if ( defined( $rec{URL} ) ) {
-                $rec{URL} = $rec{"URL_ORIG"};
-                $rec{URL} =~ s!\$1!$dir1!;
-                $rec{URL} =~ s!\$2!$dir2!;
-            }
-            if ( defined( $rec{AUTH_URL} ) ) {
-                $rec{AUTH_URL} = $rec{"AUTH_URL_ORIG"};
-                $rec{AUTH_URL} =~ s!\$1!$dir1!;
-                $rec{AUTH_URL} =~ s!\$2!$dir2!;
-            }  
+            $rec{URL} = $rec{"URL_ORIG"};
+            $rec{URL} =~ s!\$1!$dir1!;
+            $rec{URL} =~ s!\$2!$dir2!;
+            $rec{AUTH_URL} = $rec{"AUTH_URL_ORIG"};
+            $rec{AUTH_URL} =~ s!\$1!$dir1!;
+            $rec{AUTH_URL} =~ s!\$2!$dir2!;
 
             # check for svn SSL problems
             # this needs to be done after all substitutions have been performed
