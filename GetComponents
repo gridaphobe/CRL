@@ -823,7 +823,7 @@ sub get_status {
     $|++;
     print "Would you like a diff for these files? yes [no] ";
     my $answer = <STDIN>;
-    if ( $answer =~ /y/ ) { get_diff() }
+    if ( $answer =~ m/^y$/i || $answer =~ m/^yes$/i ) { get_diff() }
     exit 0;
 }
 
@@ -1009,7 +1009,7 @@ sub prompt_for_update {
       print "Not updating existing components. If you want an update, re-run with --update\n";
     }
     $|--;
-    $DO_UPDATES = 1 if ( $answer =~ /^y/i );
+    $DO_UPDATES = 1 if ( $answer =~ /^[yY]/ );
 }
 
 sub process_components {
