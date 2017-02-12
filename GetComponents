@@ -1791,6 +1791,7 @@ sub git_update_repo {
     ( $err, $out ) = run_command("cd $repo_loc && $git branch");
     $out =~ /^\*\s*(.*)/m;
     my $current_branch = $1;
+    # TODO: this is broken since git does not report "no branch" when on a tag for example
     if ($current_branch =~ /no branch/) {
         # figure out which tag we're on....
         my $commit = `cd $repo_loc && $git rev-parse HEAD`;
@@ -1805,6 +1806,7 @@ sub git_update_repo {
         # 2. branch exists remotely, needs local tracking branch
         # 3. branch is actually tag, do nothing
 
+        # TODO: fix this it fails since it uses the branch name as a regex
         if ( `cd $repo_loc && $git branch` =~ /$branch/m ) {
             # case 1
             # checkout branch and pull --rebase
