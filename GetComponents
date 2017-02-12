@@ -1505,10 +1505,20 @@ sub handle_git {
             # determine if we need a branch or tag checkout
             if ( defined $component{"REPO_BRANCH"} ) {
                 @branches = split(/, /, $component{"REPO_BRANCH"});
-                my $real_branches = `cd $repo_loc && $git tag -l`;
+                my ( $out, $err ) = run_command("cd $repo_loc && $git tag -l");
+                if ($err) {
+                    my $log = "Could obtain list of tags in mmodule $checkout\n";
+                    $out =~ s/^(?!fatal).*$//gmi;
+                    $out =~ s/\n+/\n/g;
+                    $log .= $out;
+                    WARN($log);
+                    push( @components_error, $checkout );
+                    return $err;
+                }
+                my %tags = map { ($_,1) } split(/\n/, $out);
                 for $branch (@branches) {
                     # determine if $branch is actually a tag
-                    if ( $real_branches =~ /^$branch/m ) {
+                    if ( exists $tags{$branch} ) {
                         $tag = $branch;
                         $branch = undef;
                     }
