@@ -1460,6 +1460,12 @@ sub handle_git {
     if ( defined( $component{"AUTH_URL"} ) ) {
         $url     = $component{"AUTH_URL"};
     }
+    # this won't work right now due to the way --anonymous is implemented
+    # namely by removing AUTH_URL from the %components hash
+    my $pushurl = $url;
+    if ( defined( $component{"AUTH_URL"} ) ) {
+        $pushurl = $component{"AUTH_URL"};
+    }
     my $shallow;
     if    ( $SHALLOW_CLONE == 1 ) { $shallow = ' --depth 1' }
     elsif ( $SHALLOW_CLONE == 0 ) { $shallow = '' }
@@ -1500,6 +1506,17 @@ sub handle_git {
                 lock( @components_error );
                 push( @components_error, $checkout );
                 return $err;
+            }
+            if ( $pushurl ne $url) {
+                $cmd = "$git remote set-url --push origin $pushurl";
+                my ( $err, $out ) = run_command($cmd);
+                if ($err) {
+                    my $log = "Could not set authenticated push url for module $checkout\n";
+                    $out =~ s/^(?!fatal).*$//gmi;
+                    $out =~ s/\n+/\n/g;
+                    $log .= $out;
+                    WARN($log);
+                }
             }
             
             # determine if we need a branch or tag checkout
