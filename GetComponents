@@ -1473,6 +1473,10 @@ sub handle_git {
     if ( defined( $component{"AUTH_URL"} ) ) {
         $url     = $component{"AUTH_URL"};
     }
+    my $pushurl = undef;
+    if ( defined( $component{"AUTH_URL_ORIG"} ) ) {
+        $pushurl = $component{"AUTH_URL_ORIG"};
+    }
     my $shallow;
     if    ( $SHALLOW_CLONE == 1 ) { $shallow = ' --depth 1' }
     elsif ( $SHALLOW_CLONE == 0 ) { $shallow = '' }
@@ -1521,6 +1525,17 @@ sub handle_git {
                 lock( @components_error );
                 push( @components_error, $checkout );
                 return $ierr;
+            }
+            if ( defined $pushurl) {
+                $cmd = "cd '$repo_loc' && $git remote set-url --push origin $pushurl";
+                my ( $err, $out ) = run_command($cmd);
+                if ($err) {
+                    my $log = "Could not set authenticated push url for module $checkout\n";
+                    $out =~ s/^(?!fatal).*$//gmi;
+                    $out =~ s/\n+/\n/g;
+                    $log .= $out;
+                    WARN($log);
+                }
             }
             
             ${ $updated_git_repos{$git_repo} } = 1;
