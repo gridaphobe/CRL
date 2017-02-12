@@ -445,7 +445,7 @@ sub parse_list {
         { no warnings 'all'; %rec = @pairs; }
 
         # skip ignored thorns
-        if ( $rec{"TYPE"} =~ /ignore/ ) {
+        if ( $rec{"TYPE"} eq "ignore" ) {
             next;
         }
 
@@ -512,7 +512,7 @@ sub parse_list {
             print "Please enter the path to curl or wget: ";
             my $path = <STDIN>;
             chomp $path;
-            if ( $path =~ /curl/ ) {
+            if ( $path eq "curl" ) {
                 $curl = $path;
 
                 # verify that we actually have curl now...
@@ -1432,7 +1432,7 @@ sub handle_svn {
         return 0 if $err;
         $out =~ m!<url>(.*)</url>!;
         my $old_url = $1;
-        unless ($old_url =~ /$url/) {
+        unless ($old_url eq $url) {
             # URL's don't match. try `svn switch`
             ( $err, $out ) = run_command("$svn --non-interactive $cert_hack switch $new_url $target/$dir");
             if ($err) {
@@ -1735,10 +1735,10 @@ sub handle_git {
         my ( $err, $out ) = run_command($cmd);
         chomp($out);
         $verified_git_repos{$git_repo} = 1;
-        if (! ( $out =~ /$url/ )) {
+        if (! ( $out eq $url )) {
             WARN("git::verify_url: URLs do not match. Stored URL: <$url>, current URL: <$out>");
         }
-        return ( $out =~ /$url/ );
+        return ( $out eq $url );
     }
     else { DIE("Unrecognized checkout method: $method") }
 }
@@ -2557,9 +2557,9 @@ sub handle_hg {
         $verified_hg_repos{$hg_repo} = 1;
         # match against either anonymous or authenticated URL, assuming
         # both point to actually the same repository
-        return ( $out =~ /$component{"URL"}/ or
+        return ( $out eq $component{"URL"} or
                  (defined $component{"AUTH_URL"} and
-                  $out =~ /$component{"AUTH_URL"}/) );
+                  $out eq $component{"AUTH_URL"}) );
     }
 
     else { DIE("Unrecognized checkout method: $method") }
@@ -2676,7 +2676,7 @@ sub filter_status_output {
             foreach my $c (@all_components) {
                 my $dir = defined($c->{NAME}) ? $c->{NAME} : $c->{CHECKOUT};
                 my $checkout = "$c->{TARGET}/$dir";
-                if ($checkout =~ /$path/) {
+                if ($checkout eq $path) {
                     $line = '';
                     last;
                 }
