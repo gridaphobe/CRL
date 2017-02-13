@@ -990,10 +990,23 @@ sub prompt_for_update {
 }
 
 sub process_components {
-    (my $action, my @components : shared) = @_;
+    my ($action, @components) = @_;
     if ($PARALLEL) {
         no warnings 'threads';
-        $QUEUE->enqueue(@components);
+        # since we must serialize access to each repo we group checkouts by
+        # repository so that we actually achieve some parallelism and do not
+        # just spend our time waiting for the repository commands to finish in
+        # another thread
+        my %component_groups;
+        foreach my $component (@components) {
+            my $url = $component->{"URL"};
+            if ( not exists $component_groups{$url} ) {
+                my @component_group : shared;
+                $component_groups{$url} = \@component_group;
+            }
+            push @{ $component_groups{$url} }, $component;
+        }
+        $QUEUE->enqueue( values %component_groups );
         my $thr1 = threads->create( \&worker, $action );
         my $thr2 = threads->create( \&worker, $action );
         my $thr3 = threads->create( \&worker, $action );
@@ -1017,27 +1030,33 @@ sub worker {
     # capture error code so that we can tell our own caller about it
     eval {
     my $first_held = undef;
-    while ( my $component = $QUEUE->dequeue_nb() ) {
-        my $all_prereqs_done = 1;
-        foreach my $prereq ( @{ $component->{"PREREQUISITS"} } ) {
-            lock ( %{ $prereq } );
-            $all_prereqs_done = $all_prereqs_done && $prereq->{"COMPLETED"};
-        }
-        if ($all_prereqs_done) {
-            $first_held = undef;
-            process_component( $component->{TYPE}, $method, $component );
-        } else {
-            if ( defined( $first_held ) ) {
-                # we have traversed the whole list and found nothing to do,
-                # wait for some other thread to make some progress a make some
-                # more work available
-                # refaddr cannot be trusted for shared
-                # (http://perldoc.perl.org/threads/shared.html#BUGS-AND-LIMITATIONS)
-                sleep( 1 ) if $first_held == is_shared( $component );
-            } else {
-                $first_held = is_shared( $component );
+    while ( my $component_group = $QUEUE->dequeue_nb() ) {
+        foreach my $component ( @{ $component_group } ) {
+            {
+                lock( %{ $component } );
+                next if ($component->{"COMPLETED"});
             }
-            $QUEUE->enqueue($component);
+
+            my $all_prereqs_done = 1;
+            foreach my $prereq ( @{ $component->{"PREREQUISITS"} } ) {
+                lock ( %{ $prereq } );
+                $all_prereqs_done = $all_prereqs_done && $prereq->{"COMPLETED"};
+            }
+            if ($all_prereqs_done) {
+                $first_held = undef;
+                process_component( $component->{TYPE}, $method, $component );
+            } else {
+                if ( defined( $first_held) ) {
+                    # we have traversed the whole list and found nothing to do,
+                    # wait for some other thread to make some progress a make some
+                    # more work available
+                    sleep( 1 ) if $first_held == $component;
+                } else {
+                    $first_held = $component;
+                }
+                $QUEUE->enqueue($component_group);
+                last;
+            }
         }
     } };
     return $@;
