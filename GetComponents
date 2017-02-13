@@ -646,9 +646,9 @@ sub parse_list {
                     $git_repo =~ s/\.git$//;
                     $git_repo =~ s/^.*[:\/]//;
                 }
-                $rec{"GIT_REPO"} = $git_repo;
-                $rec{"GIT_REPO"} =~ s!\$1!$dir1!;
-                $rec{"GIT_REPO"} =~ s!\$2!$dir2!;
+                $rec{"REPO"} = $git_repo;
+                $rec{"REPO"} =~ s!\$1!$dir1!;
+                $rec{"REPO"} =~ s!\$2!$dir2!;
                 
                 # add the repo to %updated_git_repos and set it to 0
                 # we will use this to track which repos have already been cloned
@@ -670,9 +670,9 @@ sub parse_list {
                     $darcs_repo =~ s/_darcs$//;
                     $darcs_repo =~ s/^.*[:\/]//;
                 }
-                $rec{"DARCS_REPO"} = $darcs_repo;
-                $rec{"DARCS_REPO"} =~ s!\$1!$dir1!;
-                $rec{"DARCS_REPO"} =~ s!\$2!$dir2!;
+                $rec{"REPO"} = $darcs_repo;
+                $rec{"REPO"} =~ s!\$1!$dir1!;
+                $rec{"REPO"} =~ s!\$2!$dir2!;
                 
                 # add the repo to %updated_darcs_repos and set it to 0
                 # we will use this to track which repos have already been cloned
@@ -695,9 +695,9 @@ sub parse_list {
                     $hg_repo =~ s/\/$//g;
                     $hg_repo =~ s/^.*[:\/]//;
                 }
-                $rec{"HG_REPO"} = $hg_repo;
-                $rec{"HG_REPO"} =~ s!\$1!$dir1!;
-                $rec{"HG_REPO"} =~ s!\$2!$dir2!;
+                $rec{"REPO"} = $hg_repo;
+                $rec{"REPO"} =~ s!\$1!$dir1!;
+                $rec{"REPO"} =~ s!\$2!$dir2!;
                 
                 # add the repo to %updated_hg_repos and set it to 0
                 # we will use this to track which repos have already been cloned
@@ -1442,7 +1442,7 @@ sub handle_git {
     elsif ( $SHALLOW_CLONE == 0 ) { $shallow = '' }
     my $checkout      = $component{"CHECKOUT"};
     my $repo_path     = $component{"REPO_PATH"};
-    my $git_repo      = $component{"GIT_REPO"};
+    my $git_repo      = $component{"REPO"};
     my $cmd           = '';
     my $git_repos_dir = '';
     my @branches = defined $component{REPO_BRANCH} ? 
@@ -1942,7 +1942,7 @@ sub handle_darcs {
     elsif ( $SHALLOW_CLONE == 0 ) { $shallow = '' }
     my $checkout        = $component{"CHECKOUT"};
     my $repo_path       = $component{"REPO_PATH"};
-    my $darcs_repo      = $component{"DARCS_REPO"};
+    my $darcs_repo      = $component{"REPO"};
     my $cmd             = '';
     my $darcs_repos_dir = '';
     my $tag = defined( $component{REPO_BRANCH} ) ? 
@@ -2260,7 +2260,7 @@ sub handle_hg {
     }
     my $checkout     = $component{"CHECKOUT"};
     my $repo_path    = $component{"REPO_PATH"};
-    my $hg_repo      = $component{"HG_REPO"};
+    my $hg_repo      = $component{"REPO"};
     my $cmd          = '';
     my $hg_repos_dir = '';
     my $branch =
