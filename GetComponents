@@ -765,6 +765,22 @@ sub parse_list {
         }
     }
     $combined_components .= $orig_file;
+
+    # check that there are not duplicate checkouts which would lead to infinite
+    # loops when computing dependendencies
+    my (%components_seen, @dupes);
+    foreach my $component (@all_components) {
+      my $target = $component->{"TARGET"};
+      my $checkout = $component->{"CHECKOUT"};
+      my $dir = File::Spec->canonpath("$target/$checkout");
+      $dir =~ s!^\Q$ROOT\E/!!;
+      if (exists $components_seen{$dir}) {
+          push @dupes, $dir;
+      } else {
+          $components_seen{$dir} = 1;
+      }
+    }
+    DIE("Duplicate checkouts: ".join(" ", @dupes)) if ( @dupes );
 }
 
 sub print_list {
