@@ -44,19 +44,16 @@ use POSIX qw(strftime);
 
 # import optional threading modules
 my $PARALLEL;
-my %semaphores;
 my $QUEUE;
 eval {
     require threads;
     require threads::shared;
     require Thread::Queue;
-    require Thread::Semaphore;
 };
 unless ($@) {
     import threads;
     import threads::shared;
     import Thread::Queue;
-    import Thread::Semaphore;
 
     #$PARALLEL = 1;
     $QUEUE = Thread::Queue->new();
@@ -67,6 +64,7 @@ my $combined_components = "# This file was automatically generated "
 my %components_to_checkout;
 my %components_to_update;
 my @all_components;
+# to avoid deadlock no other lock may be acquired while holding any of these
 my $checkout_size : shared = 0;
 my $update_size : shared   = 0;
 my @components_error : shared;
@@ -102,6 +100,9 @@ my $darcs_found = 0;
 my $wget_found  = 0;
 my $curl_found  = 0;
 my $hg_found    = 0;
+# these are hashes to shared references, only the references may be locked and
+# only one may be held at any time. The locsk are uses to serialize calls to
+# git/darcs/hg in a single repository
 my %updated_git_repos : shared;
 my %updated_darcs_repos : shared;
 my %updated_hg_repos : shared;
@@ -651,10 +652,8 @@ sub parse_list {
                 # we will use this to track which repos have already been cloned
                 # or updated
                 if (not exists $updated_git_repos{$git_repo}) {
-                    $updated_git_repos{$git_repo} = 0;
-                }
-                if ($PARALLEL and not exists $semaphores{$git_repo}) {
-                    $semaphores{$git_repo} = Thread::Semaphore->new();
+                    my $zero : shared = 0;
+                    $updated_git_repos{$git_repo} = \$zero;
                 }
             }
     
@@ -677,10 +676,8 @@ sub parse_list {
                 # we will use this to track which repos have already been cloned
                 # or updated
                 if (not exists $updated_darcs_repos{$darcs_repo}) {
-                    $updated_darcs_repos{$darcs_repo} = 0;
-                }
-                if ($PARALLEL and not exists $semaphores{$darcs_repo}) {
-                    $semaphores{$darcs_repo} = Thread::Semaphore->new();
+                    my $zero : shared = 0;
+                    $updated_darcs_repos{$darcs_repo} = \$zero;
                 }
             }
     
@@ -704,10 +701,8 @@ sub parse_list {
                 # we will use this to track which repos have already been cloned
                 # or updated
                 if (not exists $updated_hg_repos{$hg_repo}) {
-                    $updated_hg_repos{$hg_repo} = 0;
-                }
-                if ($PARALLEL and not exists $semaphores{$hg_repo}) {
-                    $semaphores{$hg_repo} = Thread::Semaphore->new();
+                    my $zero : shared = 0;
+                    $updated_hg_repos{$hg_repo} = \$zero;
                 }
             }
 
@@ -716,6 +711,9 @@ sub parse_list {
             $rec{"COMPLETED"} = 0;
 
             $rec{"CHECKOUT"} = $checkout;
+            # a lock() on this is used to control write access to the
+            # "COMPLETED" member, no further lock may be acquired while holding
+            # this lock
             my %component : shared = %rec;
             my $name = $rec{"NAME"};
             my $dir = defined($name) ? $name : $checkout;
@@ -815,13 +813,13 @@ sub get_diff {
     # first reset all updated_xxx_repos hashes
     # they are also used by get_status
     foreach my $key (keys %updated_git_repos) {
-        $updated_git_repos{$key} = 0;
+        ${ $updated_git_repos{$key} } = 0;
     }
     foreach my $key (keys %updated_darcs_repos) {
-        $updated_darcs_repos{$key} = 0;
+        ${ $updated_darcs_repos{$key} } = 0;
     }
     foreach my $key (keys %updated_hg_repos) {
-        $updated_hg_repos{$key} = 0;
+        ${ $updated_hg_repos{$key} } = 0;
     }
     foreach my $component (@all_components) {
         $checkout_types{ $component->{TYPE} }->( 'diff', %{$component} );
@@ -1037,18 +1035,19 @@ sub process_component {
         DIE("Unrecognized checkout type: $type");
     }
     my $err = $checkout_types{$type}->( $method, %{ $component } );
-    if ($PARALLEL) {
-        lock($component);
-        $component->{"COMPLETED"} = 1;
-    }
+    lock($component);
+    $component->{"COMPLETED"} = 1;
 
     # increment the checkout or update counter
-    # TODO: this has a race conditon acceses checkout_size and update_size when
-    # threads are used (unless Perl automatically serializes access which seems
-    # unlikely given that Thread::lock exists)
     unless ($err) {
-        $checkout_size++ if $method eq 'checkout';
-        $update_size++   if $method eq 'update';
+        if ( $method eq 'checkout' ) {
+            lock( $checkout_size );
+            $checkout_size++;
+        }
+        if ( $method eq 'update' ) {
+            lock( $update_size );
+            $update_size++;
+        }
     }
 }
 
@@ -1125,6 +1124,7 @@ sub handle_cvs {
             #$out =~ s'^(?!\S*:\s).*$''gmi;
             $log .= $out;
             WARN($log);
+            lock( @components_error );
             push( @components_error, $checkout );
         }
         return $err;
@@ -1142,6 +1142,7 @@ sub handle_cvs {
             #$out =~ s'^(?!\S*:\s).*$''gmi;
             $log .= $out;
             WARN($log);
+            lock( @components_error );
             push( @components_error, $checkout );
         }
         return $err;
@@ -1259,6 +1260,7 @@ sub handle_svn {
             $out =~ s/\n+/\n/g;
             $log .= $out;
             WARN($log);
+            lock( @components_error );
             push( @components_error, $checkout );
         }
         return $err;
@@ -1281,12 +1283,14 @@ sub handle_svn {
             if (!defined($old_location)) {
                 WARN("Could not determine old location of module $checkout while ".
                      "trying relocation");
+                lock( @components_error );
                 push( @components_error, $checkout );
             } else {
                 $cmd = "cd $target/$dir && $svn --non-interactive $cert_hack switch --relocate $old_location $new_location";
                 ( $err, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
                 if ( $err || $out =~ /^svn/gmi ) {
                     WARN("Could not relocate module $checkout");
+                    lock( @components_error );
                     push( @components_error, $checkout );
                 }
             }
@@ -1297,6 +1301,7 @@ sub handle_svn {
             $out =~ s/\n+/\n/g;
             $log .= $out;
             WARN($log);
+            lock( @components_error );
             push( @components_error, $checkout );
         }
         elsif ($out =~ /^[CE]\s+/gm && $out =~ /conflicts/gm) {
@@ -1305,7 +1310,8 @@ sub handle_svn {
             $out =~ s/\n+/\n/g;
             $log .= $out;
             WARN($log);
-            push( @components_error, $checkout . ": conflict during update" );
+            lock( @components_error );
+            push( @components_error, $checkout );
             $err = 1;
         }
         else {
@@ -1317,7 +1323,8 @@ sub handle_svn {
                 $out =~ s/\n+/\n/g;
                 $log .= $out;
                 WARN($log);
-                push( @components_error, $checkout . ": pre-existing conflicts" );
+                lock( @components_error );
+                push( @components_error, $checkout );
                 $err = 1;
             }
         }
@@ -1410,18 +1417,17 @@ sub handle_git {
     my $branch;
     my $tag;
     my $repo_loc = "$ROOT/repos/$git_repo";
+
+    lock( ${ $updated_git_repos{$git_repo} } );
     
     if ( $method eq 'checkout' ) {
 
-        if ($PARALLEL) {
-            $semaphores{$git_repo}->down();
-        }
         print_checkout_info( $checkout, $url, $target, $name );
 
         run_command("mkdir -p $ROOT/repos");
 
         # first check to see if previous attempt at clone failed
-        if ( $updated_git_repos{$git_repo} == -1 ) {
+        if ( ${ $updated_git_repos{$git_repo} } == -1 ) {
             return -1;
         }
 
@@ -1435,6 +1441,7 @@ sub handle_git {
                 $out =~ s/\n+/\n/g;
                 $log .= $out;
                 WARN($log);
+                lock( @components_error );
                 push( @components_error, $checkout );
                 return $err;
             }
@@ -1468,15 +1475,15 @@ sub handle_git {
                                 $new = "$repo_loc.branch.failed"
                             }
                             run_command("mv $repo_loc $new");
-                            $updated_git_repos{$git_repo} = -1;
+                            ${ $updated_git_repos{$git_repo} } = -1;
                             my $log =
                                 "Could not checkout $checkout, "
                               . "unable to switch to branch $branch. "
                               . "Any existing symlinks to $checkout will be "
                               . "broken";
                             WARN($log);
-                            push( @components_error,
-                                $checkout . ": symlinks may be broken" );
+                            lock( @components_error );
+                            push( @components_error, $checkout );
                             return $err;
                         }
                     } elsif ( defined $tag ) {
@@ -1492,25 +1499,25 @@ sub handle_git {
                                 $new = "$repo_loc.branch.failed"
                             }
                             run_command("mv $repo_loc $new");
-                            $updated_git_repos{$git_repo} = -1;
+                            ${ $updated_git_repos{$git_repo} } = -1;
                             my $log =
                                 "Could not checkout $checkout, "
                               . "unable to switch to tag $branch. "
                               . "Any existing symlinks to $checkout will be "
                               . "broken";
                             WARN($log);
-                            push( @components_error,
-                                $checkout . ": symlinks may be broken" );
+                            lock( @components_error );
+                            push( @components_error, $checkout );
                             return $err;
                         }
                     }
                 }
             }
-            $updated_git_repos{$git_repo} = 1;
+            ${ $updated_git_repos{$git_repo} } = 1;
         }
 
         # if git repo has already been cloned, we will pull the latest version
-        elsif ( $updated_git_repos{$git_repo} == 0 ) {
+        elsif ( ${ $updated_git_repos{$git_repo} } == 0 ) {
             git_stash_update_repo( $git_repo, $repo_loc, $checkout, @branches );
         }
 
@@ -1553,10 +1560,8 @@ sub handle_git {
             #return if (-e "$checkout_item");
             my ( $err, $out ) = run_command($cmd);
             if ($err) {
-                push( @components_error, $checkout . ": symlink error." );
-            }
-            if ($PARALLEL) {
-                $semaphores{$git_repo}->up();
+                lock( @components_error );
+                push( @components_error, $checkout );
             }
             return $err;
         }
@@ -1567,10 +1572,8 @@ sub handle_git {
             return if ( -e "$target_dir/$name" );
             my ( $err, $out ) = run_command($cmd);
             if ($err) {
-                push( @components_error, $checkout . ": symlink error." );
-            }
-            if ($PARALLEL) {
-                $semaphores{$git_repo}->up();
+                lock( @components_error );
+                push( @components_error, $checkout );
             }
             return $err;
         }
@@ -1580,10 +1583,8 @@ sub handle_git {
             return if ( -e "$target_dir/$checkout_item" );
             my ( $err, $out ) = run_command($cmd);
             if ($err) {
-                push( @components_error, $checkout . ": symlink error." );
-            }
-            if ($PARALLEL) {
-                $semaphores{$git_repo}->up();
+                lock( @components_error );
+                push( @components_error, $checkout );
             }
             return $err;
         }
@@ -1591,14 +1592,10 @@ sub handle_git {
 
     elsif ( $method eq 'update' ) {
 
-        if ( $updated_git_repos{$git_repo} == -1 ) {
+        if ( ${ $updated_git_repos{$git_repo} } == -1 ) {
             return -1;
         }
-        elsif ( $updated_git_repos{$git_repo} == 0 ) {
-            if ($PARALLEL) {
-                $semaphores{$git_repo}->down();
-            }
-
+        elsif ( ${ $updated_git_repos{$git_repo} } == 0 ) {
             if (  !-e "$ROOT/repos/$git_repo"
                 && -e "$ROOT/git-repos/$git_repo" )
             {
@@ -1610,10 +1607,6 @@ sub handle_git {
             
             my $err = git_stash_update_repo( $git_repo, $repo_loc, $checkout,
                                              @branches);
-            
-            if ($PARALLEL) {
-                $semaphores{$git_repo}->up();
-            }
             return $err;
         }
 
@@ -1628,7 +1621,7 @@ sub handle_git {
     elsif ( $method eq 'status' ) {
 
         # only need to run status once per repo
-        return if $updated_git_repos{$git_repo};
+        return if ${ $updated_git_repos{$git_repo} };
         
         my ( $err, $out ) = run_command("cd $repo_loc && $git status -s");
         $out = filter_status_output($out);
@@ -1636,13 +1629,13 @@ sub handle_git {
             print "In $ROOT/repos/$git_repo:\n";
             print "$out\n";
         }
-        $updated_git_repos{$git_repo} = 1;
+        ${ $updated_git_repos{$git_repo} } = 1;
     }
 
     elsif ( $method eq 'diff' ) {
 
         # only need to run diff once per repo
-        return if $updated_git_repos{$git_repo};
+        return if ${ $updated_git_repos{$git_repo} };
         
         $cmd = "cd $repo_loc && $git diff --exit-code";
         my ( $err, $out ) = run_command($cmd);
@@ -1656,7 +1649,7 @@ sub handle_git {
         }
 
         # reuse this hash, we won't be updating anything this run..
-        $updated_git_repos{$git_repo} = 1;
+        ${ $updated_git_repos{$git_repo} } = 1;
     }
 
     elsif ( $method eq 'authenticate' ) {
@@ -1690,10 +1683,11 @@ sub git_stash_update_repo {
     # stash local changes, if necessary
     my ( $err, $out ) = run_command("cd $repo_loc && $git stash save GetComponents-tmp");
     if ($err) {
-        push( @components_error, $checkout );
         my $logmsg = "Could not update $git_repo. Could not stash local changes. Error message was '$out'.";
         WARN($logmsg);
-        $updated_git_repos{$git_repo} = -1;
+        ${ $updated_git_repos{$git_repo} } = -1;
+        lock( @components_error );
+        push( @components_error, $checkout );
         return $err;
     }
 
@@ -1702,10 +1696,11 @@ sub git_stash_update_repo {
     # pop stash if necessary
     ( $err, $out ) = run_command("cd $repo_loc && if $git stash list | grep -q GetComponents-tmp; then $git stash pop \$($git stash list | grep GetComponents-tmp | sed -e 's/:.*//'); fi");
     if ($err) {
-        push( @components_error, $checkout );
         my $logmsg = "Could not update $git_repo. Could not pop stashed changes. Error message was '$out'.";
         WARN($logmsg);
-        $updated_git_repos{$git_repo} = -1;
+        ${ $updated_git_repos{$git_repo} } = -1;
+        lock( @components_error );
+        push( @components_error, $checkout );
         return $err;
     }
     return $ret;
@@ -1717,11 +1712,12 @@ sub git_update_repo {
     # update remote origin to make sure we can see all remote branches
     my ( $err, $out ) = run_command("cd $repo_loc && $git remote update origin");
     if ($err) {
-        push( @components_error, $checkout );
         my $logmsg = "Could not update $git_repo. "
           . "Could not update remote 'origin'.";
         WARN($logmsg);
-        $updated_git_repos{$git_repo} = -1;
+        ${ $updated_git_repos{$git_repo} } = -1;
+        lock( @components_error );
+        push( @components_error, $checkout );
         return $err;
     }
     
@@ -1753,11 +1749,12 @@ sub git_update_repo {
                             "fi && " .
                             "$git pull --rebase origin $branch");
             if ($err) {
-                push( @components_error, $checkout );
                 my $logmsg = "Could not update $git_repo. "
                   . "Could not update branch $branch.";
                 WARN($logmsg);
-                $updated_git_repos{$git_repo} = -1;
+                ${ $updated_git_repos{$git_repo} } = -1;
+                lock( @components_error );
+                push( @components_error, $checkout );
                 return $err;
             }
         } elsif ( `cd $repo_loc && $git branch -r` =~ /$branch/m ) {
@@ -1766,11 +1763,12 @@ sub git_update_repo {
                         "cd $repo_loc && " .
                         "$git checkout --track -b $branch origin/$branch");
             if ($err) {
-                push( @components_error, $checkout );
                 my $logmsg = "Could not update $git_repo. "
                   . "Could not create local branch for $branch.";
                 WARN($logmsg);
-                $updated_git_repos{$git_repo} = -1;
+                ${ $updated_git_repos{$git_repo} } = -1;
+                lock( @components_error );
+                push( @components_error, $checkout );
                 return $err;
             }
         } # no need for else statement, do nothing for tags
@@ -1783,16 +1781,17 @@ sub git_update_repo {
                 "  $git checkout $current_branch ; " .
                 "fi");
     if ($err) {
-        push( @components_error, $checkout );
         my $logmsg = "Could not update $git_repo. "
           . "Could not checkout original branch.";
         WARN($logmsg);
-        $updated_git_repos{$git_repo} = -1;
+        ${ $updated_git_repos{$git_repo} } = -1;
+        lock( @components_error );
+        push( @components_error, $checkout );
         return $err;
     }
     
-    $updated_git_repos{$git_repo} = 1
-      unless $updated_git_repos{$git_repo} == -1;
+    ${ $updated_git_repos{$git_repo} } = 1
+      unless ${ $updated_git_repos{$git_repo} } == -1;
     
     return $err;
 }
@@ -1834,6 +1833,7 @@ sub handle_curl {
         print_checkout_info( $checkout, $url, $target, $name );
         my ( $err, $out ) = run_command($cmd);
         if ($err) {
+            lock( @components_error );
             push( @components_error, $checkout );
         }
         return $err;
@@ -1867,7 +1867,10 @@ sub handle_curl {
         run_command("mv $target/$checkout $target/$temp");
         print_update_info( $checkout, $url, $target, $name );
         my ( $err, $out ) = run_command($cmd);
-        push( @components_error, $checkout ) if $err;
+        if ( $err ) {
+            lock( @components_error );
+            push( @components_error, $checkout );
+        }
 
         # compare new version, if equivalent delete old
         ( $err, $out ) = run_command("diff $target/$checkout $target/$temp");
@@ -1914,16 +1917,14 @@ sub handle_darcs {
 
     my $repo_loc = "$ROOT/repos/$darcs_repo";
 
-    if ( $method eq 'checkout' ) {
+    lock( ${ $updated_darcs_repos{$darcs_repo} } );
 
-        if ($PARALLEL) {
-            $semaphores{$darcs_repo}->down();
-        }
+    if ( $method eq 'checkout' ) {
 
         run_command("mkdir -p $ROOT/repos");
 
         # first check to see if previous attempt at clone failed
-        if ( $updated_darcs_repos{$darcs_repo} == -1 ) {
+        if ( ${ $updated_darcs_repos{$darcs_repo} } == -1 ) {
             return -1;
         }
 
@@ -1938,15 +1939,16 @@ sub handle_darcs {
                 $out =~ s/\n+/\n/g;
                 $log .= $out;
                 WARN($log);
+                lock( @components_error );
                 push( @components_error, $checkout );
                 return $err;
             }
-            $updated_darcs_repos{$darcs_repo} = 1;
+            ${ $updated_darcs_repos{$darcs_repo} } = 1;
         }
 
         # if darcs repo has already been cloned, we will pull the latest
         # version
-        elsif ( $updated_darcs_repos{$darcs_repo} == 0 ) {
+        elsif ( ${ $updated_darcs_repos{$darcs_repo} } == 0 ) {
 
             print_checkout_info( $checkout, $url, $target, $name );
             my ( $err, $out ) = run_command("$darcs pull$tag --repodir=$repo_loc");
@@ -1956,10 +1958,11 @@ sub handle_darcs {
                 $out =~ s/\n+/\n/g;
                 $log .= $out;
                 WARN($log);
+                lock( @components_error );
                 push( @components_error, $checkout );
                 return $err;
             }
-            $updated_darcs_repos{$darcs_repo} = 1;
+            ${ $updated_darcs_repos{$darcs_repo} } = 1;
         }
 
         # if darcs repo has already been updated, we will print checkout info
@@ -2004,11 +2007,8 @@ sub handle_darcs {
 
             my ( $err, $out ) = run_command($cmd);
             if ($err) {
-                push( @components_error, $checkout . ": symlink error." );
-            }
-
-            if ($PARALLEL) {
-                $semaphores{$darcs_repo}->up();
+                lock( @components_error );
+                push( @components_error, $checkout );
             }
             return $err;
         }
@@ -2020,12 +2020,9 @@ sub handle_darcs {
             return if ( -e "$target_dir/$name" );
             my ( $err, $out ) = run_command($cmd);
             if ($err) {
-                push( @components_error, $checkout . ": symlink error." );
+                lock( @components_error );
+                push( @components_error, $checkout );
             }
-            if ($PARALLEL) {
-                $semaphores{$darcs_repo}->up();
-            }
-
             return $err;
         }
         else {
@@ -2034,21 +2031,16 @@ sub handle_darcs {
             return if ( -e "$target_dir/$checkout_item" );
             my ( $err, $out ) = run_command($cmd);
             if ($err) {
-                push( @components_error, $checkout . ": symlink error." );
+                lock( @components_error );
+                push( @components_error, $checkout );
             }
 
-            if ($PARALLEL) {
-                $semaphores{$darcs_repo}->up();
-            }
             return $err;
         }
     }
 
     elsif ( $method eq 'update' ) {
-        if ( $updated_darcs_repos{$darcs_repo} == 0 ) {
-            if ($PARALLEL) {
-                $semaphores{$darcs_repo}->down();
-            }
+        if ( ${ $updated_darcs_repos{$darcs_repo} } == 0 ) {
             if (  !-e "$ROOT/repos/$darcs_repo"
                 && -e "$ROOT/darcs-repos/$darcs_repo" )
             {
@@ -2065,13 +2057,11 @@ sub handle_darcs {
                 $out =~ s/\n+/\n/g;
                 $log .= $out;
                 WARN($log);
+                lock( @components_error );
                 push( @components_error, $checkout );
             }
-            $updated_darcs_repos{$darcs_repo} = 1;
+            ${ $updated_darcs_repos{$darcs_repo} } = 1;
 
-            if ($PARALLEL) {
-                $semaphores{$darcs_repo}->up();
-            }
             return $err;
         }
 
@@ -2082,7 +2072,7 @@ sub handle_darcs {
 
     elsif ( $method eq 'status' ) {
 
-        return if $updated_darcs_repos{$darcs_repo};
+        return if ${ $updated_darcs_repos{$darcs_repo} };
         my $cmd = "cd $repo_loc && $darcs whatsnew";
         my ( $err, $out ) = run_command($cmd);
         $out = filter_status_output($out);
@@ -2090,18 +2080,18 @@ sub handle_darcs {
             print "In $ROOT/repos/$darcs_repo:\n";
             print "$out\n";
         }
-        $updated_darcs_repos{$darcs_repo} = 1;
+        ${ $updated_darcs_repos{$darcs_repo} } = 1;
     }
 
     elsif ( $method eq 'diff' ) {
 
-        return if $updated_darcs_repos{$darcs_repo};
+        return if ${ $updated_darcs_repos{$darcs_repo} };
         $cmd = "cd $repo_loc && $darcs diff -u";
         my ( $err, $out ) = run_command($cmd);
         $out =~ s!^--- a/!--- a/$ROOT/repos/$darcs_repo/!gm;
         $out =~ s!^\+\+\+ b/!\+\+\+ b/$ROOT/repos/$darcs_repo/!gm;
         print $out;
-        $updated_darcs_repos{$darcs_repo} = 1;
+        ${ $updated_darcs_repos{$darcs_repo} } = 1;
     }
 
     elsif ( $method eq 'verify_url' ) {
@@ -2164,7 +2154,10 @@ sub handle_wget {
         }
         print_checkout_info( $checkout, $url, $target, $name );
         my ( $err, $out ) = run_command($cmd);
-        push( @components_error, $checkout ) if $err;
+        if ( $err ) {
+            lock( @components_error );
+            push( @components_error, $checkout );
+        }
     }
 
     elsif ( $method eq 'update' ) {
@@ -2195,7 +2188,10 @@ sub handle_wget {
         run_command("mv $target/$checkout $target/$temp");
         print_update_info( $checkout, $url, $target, $name );
         my ( $err, $out ) = run_command($cmd);
-        push( @components_error, $checkout ) if $err;
+        if ( $err ) {
+            lock( @components_error );
+            push( @components_error, $checkout );
+        }
 
         # compare new version, if equivalent delete old
         ( $err, $out ) = run_command("diff $target/$checkout $target/$temp");
@@ -2240,15 +2236,12 @@ sub handle_hg {
 
     my $repo_loc = "$ROOT/repos/$hg_repo";
 
+    lock( ${ $updated_hg_repos{$hg_repo} } );
     if ( $method eq 'checkout' ) {
-        if ($PARALLEL) {
-            $semaphores{$hg_repo}->down();
-        }
-
         run_command("mkdir -p $ROOT/repos");
 
         # first check to see if previous attempt at clone failed
-        if ( $updated_hg_repos{$hg_repo} == -1 ) {
+        if ( ${ $updated_hg_repos{$hg_repo} } == -1 ) {
             return -1;
         }
 
@@ -2264,6 +2257,7 @@ sub handle_hg {
                 $out =~ s/\n+/\n/g;
                 $log .= $out;
                 WARN($log);
+                lock( @components_error );
                 push( @components_error, $checkout );
                 return $err;
             }
@@ -2281,14 +2275,14 @@ sub handle_hg {
                         $new = "$repo_loc.branch.failed"
                     }
                     run_command("mv $repo_loc $new");
-                    $updated_hg_repos{$hg_repo} = -1;
+                    ${ $updated_hg_repos{$hg_repo} } = -1;
                     my $log =
                         "Could not checkout $checkout, "
                       . "unable to switch to branch $branch. "
                       . "Any existing symlinks to $checkout will be broken.";
                     WARN($log);
-                    push( @components_error,
-                        $checkout . ": symlinks may be broken" );
+                    lock( @components_error );
+                    push( @components_error, $checkout );
                     return $err;
                 }
             }
@@ -2307,23 +2301,23 @@ sub handle_hg {
                         $new = "$repo_loc.date.failed"
                     }
                     run_command("mv $repo_loc $new");
-                    $updated_hg_repos{$hg_repo} = -1;
+                    ${ $updated_hg_repos{$hg_repo} } = -1;
                     my $log =
                         "Could not checkout $checkout, "
                       . "unable to checkout from date $date. "
                       . "Any existing symlinks to $checkout will be broken.";
                     WARN($log);
-                    push( @components_error,
-                        $checkout . ": symlinks may be broken" );
+                    lock( @components_error );
+                    push( @components_error, $checkout );
                     return $err;
                 }
             }
-            $updated_hg_repos{$hg_repo} = 1;
+            ${ $updated_hg_repos{$hg_repo} } = 1;
         }
 
         # if mercurial repo has already been cloned, we will pull the latest
         # version
-        elsif ( $updated_hg_repos{$hg_repo} == 0 ) {
+        elsif ( ${ $updated_hg_repos{$hg_repo} } == 0 ) {
 
             print_checkout_info( $checkout, $url, $target, $name );
             my ( $err, $out ) = run_command("$hg --repository $repo_loc pull");
@@ -2333,10 +2327,11 @@ sub handle_hg {
                 $out =~ s/\n+/\n/g;
                 $log .= $out;
                 WARN($log);
+                lock( @components_error );
                 push( @components_error, $checkout );
                 return $err;
             }
-            $updated_hg_repos{$hg_repo} = 1;
+            ${ $updated_hg_repos{$hg_repo} } = 1;
         }
 
         # if mercurial repo has already been updated, we will print checkout
@@ -2381,11 +2376,8 @@ sub handle_hg {
 
             my ( $err, $out ) = run_command($cmd);
             if ($err) {
-                push( @components_error, $checkout . ": symlink error." );
-            }
-
-            if ($PARALLEL) {
-                $semaphores{$hg_repo}->up();
+                lock( @components_error );
+                push( @components_error, $checkout );
             }
             return $err;
         }
@@ -2397,11 +2389,9 @@ sub handle_hg {
             if ( not -e "$target_dir/$name" ) {
                 ( $err, $out ) = run_command($cmd);
                 if ($err) {
-                    push( @components_error, $checkout . ": symlink error." );
+                    lock( @components_error );
+                    push( @components_error, $checkout );
                 }
-            }
-            if ($PARALLEL) {
-                $semaphores{$hg_repo}->up();
             }
             return $err;
         }
@@ -2412,21 +2402,16 @@ sub handle_hg {
             if ( not -e "$target_dir/$checkout_item" ) {
                 ( $err, $out ) = run_command($cmd);
                 if ($err) {
-                    push( @components_error, $checkout . ": symlink error." );
+                    lock( @components_error );
+                    push( @components_error, $checkout );
                 }
-            }
-            if ($PARALLEL) {
-                $semaphores{$hg_repo}->up();
             }
             return $err;
         }
     }
 
     elsif ( $method eq 'update' ) {
-        if ( $updated_hg_repos{$hg_repo} == 0 ) {
-            if ($PARALLEL) {
-                $semaphores{$hg_repo}->down();
-            }
+        if ( ${ $updated_hg_repos{$hg_repo} } == 0 ) {
             if (  !-e "$ROOT/repos/$hg_repo"
                 && -e "$ROOT/hg-repos/$hg_repo" )
             {
@@ -2444,13 +2429,10 @@ sub handle_hg {
                 $out =~ s/\n+/\n/g;
                 $log .= $out;
                 WARN($log);
+                lock( @components_error );
                 push( @components_error, $checkout );
             }
-            $updated_hg_repos{$hg_repo} = 1;
-
-            if ($PARALLEL) {
-                $semaphores{$hg_repo}->up();
-            }
+            ${ $updated_hg_repos{$hg_repo} } = 1;
             return $err;
         }
 
@@ -2461,7 +2443,7 @@ sub handle_hg {
 
     elsif ( $method eq 'status' ) {
         
-        return if $updated_hg_repos{$hg_repo};
+        return if ${ $updated_hg_repos{$hg_repo} };
         my $cmd = "cd $repo_loc && $hg status";
         my ( $err, $out ) = run_command($cmd);
         $out = filter_status_output($out);
@@ -2469,13 +2451,13 @@ sub handle_hg {
             print "In $ROOT/repos/$hg_repo:\n";
             print "$out\n";
         }
-        $updated_hg_repos{$hg_repo} = 1;
+        ${ $updated_hg_repos{$hg_repo} } = 1;
     }
 
     elsif ( $method eq 'diff' ) {
 
         # only need to run diff once per repo
-        return if $updated_hg_repos{$hg_repo};
+        return if ${ $updated_hg_repos{$hg_repo} };
 
         $cmd = "cd $repo_loc && $hg diff";
         my ( $err, $out ) = run_command($cmd);
@@ -2488,7 +2470,7 @@ sub handle_hg {
             print $out;
         }
         # reuse this hash, we won't be updating anything this run..
-        $updated_hg_repos{$hg_repo} = 1;
+        ${ $updated_hg_repos{$hg_repo} } = 1;
     }
 
     elsif ( $method eq 'authenticate' ) {
@@ -2656,6 +2638,7 @@ sub LOG {
 sub WARN {
     my $warning = shift;
     LOG($warning);
+    lock( @warnings );
     push( @warnings, $warning );
     warn( "\n", BOLD, RED, "Warning: ", RESET, "$warning\n\n" );
 }
