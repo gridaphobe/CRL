@@ -2527,6 +2527,11 @@ sub run_command {
     return ( $ret, $out );
 }
 
+sub uniq {
+  my %unique = map { $_ => 1 } @_;
+  return keys %unique;
+}
+
 sub print_checkout_info {
     return if $DEBUG;
 
@@ -2572,7 +2577,7 @@ sub print_summary {
     else {
         print "  $checkout_size components checked out.\n";
         print "  $update_size components updated.\n\n";
-        foreach my $error (@components_error) {
+        foreach my $error (sort uniq( @components_error ) ) {
             print "  Unable to process $error\n";
         }
         print "\n";
