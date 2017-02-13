@@ -38,6 +38,7 @@ use Data::Dumper;
 use Getopt::Long;
 use Pod::Usage;
 use File::stat;
+use File::Spec;
 use Term::ANSIColor qw(:constants);
 use POSIX qw(strftime);
 
@@ -169,16 +170,49 @@ verify_urls() if $DO_UPDATES;
 # start timer here, we don't care about authentication time
 my $start_time = time;
 
-foreach my $key ( sort {length($a)<=>length($b)} ( keys %components_to_checkout ) ) {
-    checkout( sort {length($a->{NAME}||$a->{CHECKOUT})<=>length($b->{NAME}||$b->{CHECKOUT})}
-                   @{ $components_to_checkout{$key} } );
-}
-if ($DO_UPDATES) {
-    foreach my $key ( sort {length($a)<=>length($b)} ( keys %components_to_update ) ) {
-        update( sort {length($a->{NAME}||$a->{CHECKOUT})<=>length($b->{NAME}||$b->{CHECKOUT})}
-                     @{ $components_to_update{$key} } );
+# compute dependencies between components so that we can order them correctly
+# during a parallel checkout
+foreach my $target ( keys %components_to_checkout ) {
+    foreach my $component ( @{ $components_to_checkout{$target} } ) {
+        my $checkout = $component->{"CHECKOUT"};
+        my $path = File::Spec->canonpath("$target/$checkout");
+
+        foreach my $other_target ( keys %components_to_checkout ) {
+            foreach my $other_component ( @{ $components_to_checkout{$other_target} } ) {
+                next if $other_component == $component;
+                my $other_checkout = $other_component->{"CHECKOUT"};
+                my $other_path = File::Spec->canonpath("$other_target/$other_checkout");
+                if ( $path =~ m!^\Q$other_path\E/! ) {
+                    push @{ $component->{"PREREQUISITS"} }, $other_component;
+                }
+            }
+        }
     }
 }
+my @all_components_to_checkout = map {@{ $components_to_checkout{$_} }} keys %components_to_checkout;
+checkout(@all_components_to_checkout);
+
+# compute dependencies between components so that we can order them correctly
+# during a parallel update
+foreach my $target ( keys %components_to_update ) {
+    foreach my $component ( @{ $components_to_update{$target} } ) {
+        my $checkout = $component->{"CHECKOUT"};
+        my $path = File::Spec->canonpath("$target/$checkout");
+
+        foreach my $other_target ( keys %components_to_update ) {
+            foreach my $other_component ( @{ $components_to_update{$other_target} } ) {
+                next if $other_component == $component;
+                my $other_checkout = $other_component->{"CHECKOUT"};
+                my $other_path = File::Spec->canonpath("$other_target/$other_checkout");
+                if ( $path =~ m!^\Q$other_path\E/! ) {
+                    push @{ $component->{"PREREQUISITS"} }, $other_component;
+                }
+            }
+        }
+    }
+}
+my @all_components_to_update = map {@{ $components_to_update{$_} }} keys %components_to_update;
+update(@all_components_to_update);
 
 write_componentlist_target();
 
@@ -677,6 +711,10 @@ sub parse_list {
                 }
             }
 
+            my @prereqs : shared = ();
+            $rec{"PREREQUISITS"} = \@prereqs;
+            $rec{"COMPLETED"} = 0;
+
             $rec{"CHECKOUT"} = $checkout;
             my %component : shared = %rec;
             my $name = $rec{"NAME"};
@@ -953,25 +991,23 @@ sub prompt_for_update {
 
 sub checkout {
     my @components : shared = @_;
-    if ($PARALLEL and scalar(@components) > 1) {
-        # checkout first component in serial, because this is likely to be a
-        # component containing other components, and parallel checkouts here
-        # might run into problems just because of that.
-        # This happens for instance with svn version 1.7 through 1.8
-        process_component( $components[0]->{TYPE}, 'checkout', %{$components[0]} );
+    if ($PARALLEL) {
         no warnings 'threads';
-        $QUEUE->enqueue(@components[1..$#components]);
+        $QUEUE->enqueue(@components);
         my $thr1 = threads->create( \&worker, 'checkout' );
         my $thr2 = threads->create( \&worker, 'checkout' );
         my $thr3 = threads->create( \&worker, 'checkout' );
         my $thr4 = threads->create( \&worker, 'checkout' );
         foreach my $thr ( threads->list() ) {
-            $thr->join();
+            my $retval = $thr->join();
+            # don't use DIE() here sine it logs the error twice if DIE() was
+            # already called in in the worker
+            die($retval) if $retval
         }
     }
     else {
         foreach my $component (@components) {
-            process_component( $component->{TYPE}, 'checkout', %{$component} );
+            process_component( $component->{TYPE}, 'checkout', $component );
         }
     }
 }
@@ -979,43 +1015,60 @@ sub checkout {
 sub update {
     my @components : shared = @_;
     if ($PARALLEL) {
-        # update first component in serial, because this is likely to be a
-        # component containing other components, and parallel updates here
-        # might run into problems just because of that.
-        # This happens for instance with svn version 1.7 through 1.8
-        process_component( $components[0]->{TYPE}, 'update', %{$components[0]} );
         no warnings 'threads';
-        $QUEUE->enqueue(@components[1..$#components]);
+        $QUEUE->enqueue(@components);
         my $thr1 = threads->create( \&worker, 'update' );
         my $thr2 = threads->create( \&worker, 'update' );
         my $thr3 = threads->create( \&worker, 'update' );
         my $thr4 = threads->create( \&worker, 'update' );
         foreach my $thr ( threads->list() ) {
-            $thr->join();
+            my $retval = $thr->join();
+            # don't use DIE() here sine it logs the error twice if DIE() was
+            # already called in in the worker
+            die($retval) if $retval
         }
     }
     else {
         foreach my $component (@components) {
-            process_component( $component->{TYPE}, 'update', %{$component} );
+            process_component( $component->{TYPE}, 'update', $component );
         }
     }
 }
 
 sub worker {
     my $method = shift;
+    # capture error code so that we can tell our own caller about it
+    eval {
     while ( my $component = $QUEUE->dequeue_nb() ) {
-        process_component( $component->{TYPE}, $method, %{$component} );
-    }
+        my $all_prereqs_done = 1;
+        foreach my $prereq ( @{ $component->{"PREREQUISITS"} } ) {
+            lock ( %{ $prereq } );
+            $all_prereqs_done = $all_prereqs_done && $prereq->{"COMPLETED"};
+        }
+        if ($all_prereqs_done) {
+            process_component( $component->{TYPE}, $method, $component );
+        } else {
+            $QUEUE->enqueue(($component,));
+        }
+    } };
+    return $@;
 }
 
 sub process_component {
-    my ( $type, $method, %component ) = @_;
+    my ( $type, $method, $component ) = @_;
     if ( !exists( $checkout_types{$type} ) ) {
         DIE("Unrecognized checkout type: $type");
     }
-    my $err = $checkout_types{$type}->( $method, %component );
+    my $err = $checkout_types{$type}->( $method, %{ $component } );
+    if ($PARALLEL) {
+        lock($component);
+        $component->{"COMPLETED"} = 1;
+    }
 
     # increment the checkout or update counter
+    # TODO: this has a race conditon acceses checkout_size and update_size when
+    # threads are used (unless Perl automatically serializes access which seems
+    # unlikely given that Thread::lock exists)
     unless ($err) {
         $checkout_size++ if $method eq 'checkout';
         $update_size++   if $method eq 'update';
