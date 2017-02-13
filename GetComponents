@@ -999,12 +999,12 @@ sub process_components {
         # another thread
         my %component_groups;
         foreach my $component (@components) {
-            my $url = $component->{"URL"};
-            if ( not exists $component_groups{$url} ) {
+            my $key = $component->{"REPO"} || $component->{"URL"};
+            if ( not exists $component_groups{$key} ) {
                 my @component_group : shared;
-                $component_groups{$url} = \@component_group;
+                $component_groups{$key} = \@component_group;
             }
-            push @{ $component_groups{$url} }, $component;
+            push @{ $component_groups{$key} }, $component;
         }
         $QUEUE->enqueue( values %component_groups );
         my $thr1 = threads->create( \&worker, $action );
