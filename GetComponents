@@ -857,7 +857,7 @@ sub write_componentlist_target {
         $fn .= "/$short_name";
 
         # write file
-        open( ALL, ">$fn" ) or die("Could not write file $fn");
+        open( ALL, ">$fn" ) or DIE("Could not write file $fn");
         print ALL $combined_components;
         close(ALL);
     }
@@ -869,7 +869,7 @@ sub write_componentlist_target {
         mkdir "$ROOT/.crl";
     }
     # write file
-    open( ALL, ">$fn" ) or die("Could not write file $fn");
+    open( ALL, ">$fn" ) or DIE("Could not write file $fn");
     print ALL $combined_components;
     close(ALL);
 }
@@ -2672,7 +2672,7 @@ sub LOG {
     }
     open( my $logfile, '>>', "$crl_dir/crl.log" ) or die $!;
     my $timestamp = strftime "%b %e %H:%M:%S %Y", localtime;
-    print {$logfile} "$timestamp:\t$log\n";
+    print {$logfile} "$timestamp:\t$log\n" or die $!;
     close $logfile or die $!;
 }
 
