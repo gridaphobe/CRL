@@ -49,11 +49,13 @@ eval {
     require threads;
     require threads::shared;
     require Thread::Queue;
+    require Scalar::Util;
 };
 unless ($@) {
     import threads;
     import threads::shared;
     import Thread::Queue;
+    import Scalar::Util;
 
     #$PARALLEL = 1;
     $QUEUE = Thread::Queue->new();
@@ -1014,6 +1016,7 @@ sub worker {
     my $method = shift;
     # capture error code so that we can tell our own caller about it
     eval {
+    my $first_held = undef;
     while ( my $component = $QUEUE->dequeue_nb() ) {
         my $all_prereqs_done = 1;
         foreach my $prereq ( @{ $component->{"PREREQUISITS"} } ) {
@@ -1021,9 +1024,20 @@ sub worker {
             $all_prereqs_done = $all_prereqs_done && $prereq->{"COMPLETED"};
         }
         if ($all_prereqs_done) {
+            $first_held = undef;
             process_component( $component->{TYPE}, $method, $component );
         } else {
-            $QUEUE->enqueue(($component,));
+            if ( defined( $first_held ) ) {
+                # we have traversed the whole list and found nothing to do,
+                # wait for some other thread to make some progress a make some
+                # more work available
+                # refaddr cannot be trusted for shared
+                # (http://perldoc.perl.org/threads/shared.html#BUGS-AND-LIMITATIONS)
+                sleep( 1 ) if $first_held == is_shared( $component );
+            } else {
+                $first_held = is_shared( $component );
+            }
+            $QUEUE->enqueue($component);
         }
     } };
     return $@;
