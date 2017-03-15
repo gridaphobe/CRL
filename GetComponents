@@ -1799,7 +1799,7 @@ sub handle_curl {
               . "rmdir $tmpdir; " . "}";
         }
         else {
-            $cmd = "cd $target && $curl --location -O $user --location $url/$checkout";
+            $cmd = "cd $target && $curl --location -O $user $url/$checkout";
         }
         print_checkout_info( $checkout, $url, $target, $name );
         my ( $err, $out ) = run_command($cmd);
@@ -1827,7 +1827,7 @@ sub handle_curl {
               . "rmdir $tmpdir; " . "}";
         }
         else {
-            $cmd = "cd $target && $curl --location -O $user --location $url/$checkout";
+            $cmd = "cd $target && $curl --location -O $user $url/$checkout";
         }
 
         # add modification timestamp to old version
