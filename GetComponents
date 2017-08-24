@@ -43,7 +43,7 @@ use Term::ANSIColor qw(:constants);
 use POSIX qw(strftime);
 
 # import optional threading modules
-my $PARALLEL;
+my ($PARALLEL, $HAVE_THREADS);
 my $QUEUE;
 eval {
     require threads;
@@ -57,7 +57,7 @@ unless ($@) {
     import Thread::Queue;
     import Scalar::Util;
 
-    #$PARALLEL = 1;
+    $HAVE_THREADS = 1;
     $QUEUE = Thread::Queue->new();
 }
 
@@ -1007,7 +1007,7 @@ sub prompt_for_update {
 
 sub process_components {
     my ($action, @components) = @_;
-    if ($PARALLEL) {
+    if ($HAVE_THREADS and $PARALLEL) {
         no warnings 'threads';
         # since we must serialize access to each repo we group checkouts by
         # repository so that we actually achieve some parallelism and do not
