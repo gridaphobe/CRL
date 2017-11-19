@@ -615,11 +615,11 @@ sub parse_list {
                     my $base = $url;
                     $base =~ s/(https\:\/\/[\w\.]+)\/(.*)$/$1/i;
                     unless ( defined $svn_servers{$base} ) {
-                        my $ret = `$svn --non-interactive info $url 2>&1`;
-                        if ( $ret =~ /svn: E230001:/ ) {
-                            my $warning = $ret;
-                            my $ret_trust = `$svn --non-interactive --trust-server-cert info $url 2>&1`;
-                            if ( $ret_trust !~ /svn: E230001:/ ) {
+                        my ($ret, $out) = run_command("$svn --non-interactive info $url", $VERBOSE, 1);
+                        if ( $out =~ /svn: E230001:/ ) {
+                            my $warning = $out;
+                            my ($ret_trust, $out_trust) = run_command("$svn --non-interactive --trust-server-cert info $url", $VERBOSE, 1);
+                            if ( $out_trust !~ /svn: E230001:/ ) {
                                 $warning .= "\nYour subversion client does not seem to handle server certificates correctly, or server $base does not supply a correct ssl certificate.";
                                 if ( $^O == "darwin" ) {
                                     $warning .= "\nThe stock subversion client installed with some OSX is broken and cannot verify any certificates. Please install a version of subversion through either Homebrew or MacPorts and re-run GetComponents. You will not be able to use any subversion repositories until then.";
@@ -1274,7 +1274,7 @@ sub handle_svn {
     if ( $url =~ m!https://! )
     {
         my $base = $url;
-        $base =~ s!(https://[\w\.]+)/(.*)$!$1!i;
+        $base =~ s!(https://[\w\.]+(:\d+)?)/(.*)$!$1!i;
         unless ( $svn_servers{$base} ) {
             $bad_cert = 1;
         }
@@ -1498,7 +1498,7 @@ sub handle_git {
             # determine if we need a branch or tag checkout
             if ( defined $component{"REPO_BRANCH"} ) {
                 @branches = split(/, /, $component{"REPO_BRANCH"});
-                my $real_branches = `cd $repo_loc && $git tag -l`;
+                my ($ret, $real_branches) = run_command("cd $repo_loc && $git tag -l");
                 for $branch (@branches) {
                     # determine if $branch is actually a tag
                     if ( $real_branches =~ /^$branch/m ) {
@@ -1776,8 +1776,8 @@ sub git_update_repo {
     my $current_branch = $1;
     if ($current_branch =~ /no branch/) {
         # figure out which tag we're on....
-        my $commit = `cd $repo_loc && $git rev-parse HEAD`;
-        $current_branch = `cd $repo_loc && $git tag --contains $commit`;
+        my $commit = run_command("cd $repo_loc && $git rev-parse HEAD");
+        ($err, $current_branch) = run_coammnd("cd $repo_loc && $git tag --contains $commit");
     }
     
     # now loop through specified branches, and append 'master'
@@ -1788,7 +1788,7 @@ sub git_update_repo {
         # 2. branch exists remotely, needs local tracking branch
         # 3. branch is actually tag, do nothing
 
-        if ( `cd $repo_loc && $git branch` =~ /$branch/m ) {
+        if ( (run_command("cd $repo_loc && $git branch"))[1] =~ /$branch/m ) {
             # case 1
             # checkout branch and pull --rebase
             ( $err, $out ) = run_command(
@@ -1806,7 +1806,7 @@ sub git_update_repo {
                 push( @components_error, $checkout );
                 return $err;
             }
-        } elsif ( `cd $repo_loc && $git branch -r` =~ /$branch/m ) {
+        } elsif ( (run_command("cd $repo_loc && $git branch -r"))[1] =~ /$branch/m ) {
             # dealing with a remote tracking branch
             ( $err, $out ) = run_command(
                         "cd $repo_loc && " .
@@ -2554,11 +2554,15 @@ sub run_command {
     # can optionally override the global verbose setting and elect to let
     # the command print to stderr (this is useful in some cases, i.e. svn
     # will print to stderr and block if the SSL certificate is not trusted)
+    use IPC::Open3;
+    use IO::Select;
+    use POSIX ":sys_wait_h";
+    use FileHandle;
+
     my $command          = shift;
     my $VERBOSE_OVERRIDE = shift;
     my $show_err         = shift;
     my $verbose = defined $VERBOSE_OVERRIDE ? $VERBOSE_OVERRIDE : $VERBOSE;
-    my $err = $show_err ? '' : '2>&1';
     if ( $command =~ /^$/ ) { return }
     if ($verbose) {
 
@@ -2569,10 +2573,43 @@ sub run_command {
         }
         else { print BOLD, "Executing: ", RESET, "$command\n" }
     }
-    my $out = "";
-    if (not $DEBUG) { $out = `$command $err`; }
-    my $ret = $?;
-    print $out if $verbose;
+
+    # run command, capturing output. Print output to screen if desired by user.
+    my ($out,$ret) = ('',-1);
+    
+    my $INFH = FileHandle->new();
+    my $OUTFH = FileHandle->new();
+    my $ERRFH = FileHandle->new();
+    # we dup() STDIN since open3 on Queenbee does not like anonymous file handles it seesm
+    open ($INFH, "<&STDIN") or die "Can't dup STDIN: $!";
+    my $pid = open3("<&STDIN", $OUTFH, $ERRFH, $command);
+    my $sel = new IO::Select();
+    
+    $sel->add($OUTFH);
+    $sel->add($ERRFH);
+    while(not waitpid($pid, WNOHANG)){
+      foreach my $h ($sel->can_read()) {
+        my $buf = undef;
+        if ($h eq $ERRFH) {
+          sysread($ERRFH,$buf,4096);
+          if($buf) {
+            print STDERR $buf if ($show_err or $verbose);
+            $out .= $buf;
+          }
+        } else {
+          sysread($OUTFH,$buf,4096);
+          if($buf) {
+            print STDOUT $buf if $verbose;
+            $out .= $buf;
+          }
+        }
+      }
+    }
+    $ret = $?;
+    close($ERRFH);
+    close($OUTFH);
+    open(STDIN, "<&=".fileno($INFH)) or die "Can't restore STDIN: $!";
+
     return ( $ret, $out );
 }
 
