@@ -615,10 +615,10 @@ sub parse_list {
                     my $base = $url;
                     $base =~ s/(https\:\/\/[\w\.]+)\/(.*)$/$1/i;
                     unless ( defined $svn_servers{$base} ) {
-                        my ($ret, $out) = run_command("$svn --non-interactive info $url", $VERBOSE, 1);
+                        my ($ret, $out) = run_command("$svn info $url", 0, 1);
                         if ( $out =~ /svn: E230001:/ ) {
                             my $warning = $out;
-                            my ($ret_trust, $out_trust) = run_command("$svn --non-interactive --trust-server-cert info $url", $VERBOSE, 1);
+                            my ($ret_trust, $out_trust) = run_command("$svn --non-interactive --trust-server-cert info $url", 0, 0);
                             if ( $out_trust !~ /svn: E230001:/ ) {
                                 $warning .= "\nYour subversion client does not seem to handle server certificates correctly, or server $base does not supply a correct ssl certificate.";
                                 if ( $^O == "darwin" ) {
