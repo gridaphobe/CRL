@@ -1002,7 +1002,7 @@ sub prompt_for_update {
     # If this is a terminal, and if we are not running inside a
     # Jupyter notebook, prompt for input. Otherwise, use the default.
     if(-t STDIN and !defined($ENV{JPY_PARENT_PID})) {
-      print "Do you want to update all existing components? yes, no [no] : ";
+      print "Do you want to update all existing components? yes, no [$answer] : ";
       $answer = <STDIN>;
       chomp $answer;
     } else {
