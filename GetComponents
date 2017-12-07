@@ -43,7 +43,7 @@ use Term::ANSIColor qw(:constants);
 use POSIX qw(strftime);
 
 # import optional threading modules
-my ($PARALLEL, $HAVE_THREADS);
+my $PARALLEL;
 my $QUEUE;
 eval {
     require threads;
@@ -57,7 +57,7 @@ unless ($@) {
     import Thread::Queue;
     import Scalar::Util;
 
-    $HAVE_THREADS = 1;
+    $PARALLEL = 1;
     $QUEUE = Thread::Queue->new();
 }
 
@@ -998,16 +998,23 @@ sub prompt_for_update {
     # if there are no components to update there's no reason to ask..
     return unless scalar( values %components_to_update );
     $|++;
-    print "Do you want to update all existing components? yes, no [no] : ";
-    my $answer = <STDIN>;
-    chomp $answer;
+    my $answer="no";
+    # If this is a terminal, and if we are not running inside a
+    # Jupyter notebook, prompt for input. Otherwise, use the default.
+    if(-t STDIN and !defined($ENV{JPY_PARENT_PID})) {
+      print "Do you want to update all existing components? yes, no [no] : ";
+      $answer = <STDIN>;
+      chomp $answer;
+    } else {
+      print "Not updating existing components. If you want an update, re-run with --update\n";
+    }
     $|--;
-    $DO_UPDATES = 1 if ( $answer =~ /^y/ );
+    $DO_UPDATES = 1 if ( $answer =~ /^y/i );
 }
 
 sub process_components {
     my ($action, @components) = @_;
-    if ($HAVE_THREADS and $PARALLEL) {
+    if ($PARALLEL) {
         no warnings 'threads';
         # since we must serialize access to each repo we group checkouts by
         # repository so that we actually achieve some parallelism and do not
