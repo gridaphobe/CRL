@@ -621,7 +621,7 @@ sub parse_list {
                             my $ret_trust = `$svn --non-interactive --trust-server-cert info $url 2>&1`;
                             if ( $ret_trust !~ /svn: E230001:/ ) {
                                 $warning .= "\nYour subversion client does not seem to handle server certificates correctly, or server $base does not supply a correct ssl certificate.";
-                                if ( $^O == "darwin" ) {
+                                if ( $^O eq "darwin" ) {
                                     $warning .= "\nThe stock subversion client installed with some OSX is broken and cannot verify any certificates. Please install a version of subversion through either Homebrew or MacPorts and re-run GetComponents. You will not be able to use any subversion repositories until then.";
                                 }
                             }
