@@ -512,7 +512,7 @@ sub parse_list {
             print "Please enter the path to curl or wget: ";
             my $path = <STDIN>;
             chomp $path;
-            if ( $path eq "curl" ) {
+            if ( $path =~ m/curl/ ) {
                 $curl = $path;
 
                 # verify that we actually have curl now...
