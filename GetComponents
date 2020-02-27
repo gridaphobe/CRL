@@ -1090,12 +1090,12 @@ sub process_component {
     if ( !exists( $checkout_types{$type} ) ) {
         DIE("Unrecognized checkout type: $type");
     }
-    my $err = $checkout_types{$type}->( $method, %{ $component } );
+    my $ierr = $checkout_types{$type}->( $method, %{ $component } );
     lock($component);
     $component->{"COMPLETED"} = 1;
 
     # increment the checkout or update counter
-    unless ($err) {
+    unless ($ierr) {
         if ( $method eq 'checkout' ) {
             lock( $checkout_size );
             $checkout_size++;
@@ -1174,8 +1174,8 @@ sub handle_cvs {
         }
 
         print_checkout_info( $checkout, $url, $target, $name );
-        my ( $err, $out ) = run_command($cmd);
-        if ( $err != 0 || $out =~ /^cvs:/gmi ) {
+        my ( $ierr, $out ) = run_command($cmd);
+        if ( $ierr != 0 || $out =~ /^cvs:/gmi ) {
             my $log = "Could not check out module $checkout\n";
             #$out =~ s'^(?!\S*:\s).*$''gmi;
             $log .= $out;
@@ -1183,7 +1183,7 @@ sub handle_cvs {
             lock( @components_error );
             push( @components_error, $checkout );
         }
-        return $err;
+        return $ierr;
     }
 
     elsif ( $method eq 'update' ) {
@@ -1192,8 +1192,8 @@ sub handle_cvs {
         $cmd = "cd '$target/$dir' && $cvs -q update -dP $date $branch";
 
         print_update_info( $checkout, $url, $target, $name );
-        my ( $err, $out ) = run_command($cmd);
-        if ( $err != 0 || $out =~ /^cvs:/gmi ) {
+        my ( $ierr, $out ) = run_command($cmd);
+        if ( $ierr != 0 || $out =~ /^cvs:/gmi ) {
             my $log = "Could not update module $checkout\n";
             #$out =~ s'^(?!\S*:\s).*$''gmi;
             $log .= $out;
@@ -1201,7 +1201,7 @@ sub handle_cvs {
             lock( @components_error );
             push( @components_error, $checkout );
         }
-        return $err;
+        return $ierr;
     }
 
     elsif ( $method eq 'status' ) {
@@ -1209,7 +1209,7 @@ sub handle_cvs {
         my $dir = defined($name) ? $name : $checkout;
         $cmd = "cd '$target/$dir' && $cvs -n -q update -dP $branch";
 
-        my ( $err, $out ) = run_command($cmd);
+        my ( $ierr, $out ) = run_command($cmd);
         $out = filter_status_output($out);
         if ( $out !~ /^$/ ) {
             print "In $target/$dir:\n";
@@ -1222,15 +1222,15 @@ sub handle_cvs {
         my $dir = defined($name) ? $name : $checkout;
         $cmd = "$cvs -q -d $url diff -u '$target/$dir'";
 
-        my ( $err, $out ) = run_command($cmd);
+        my ( $ierr, $out ) = run_command($cmd);
         print $out;
     }
 
     elsif ( $method eq 'authenticate' ) {
 
         $cmd = "$cvs -q -n -d $url checkout '$checkout' > /dev/null 2>&1";
-        my ( $err, $out ) = run_command($cmd);
-        if ( $err != 0 ) {
+        my ( $ierr, $out ) = run_command($cmd);
+        if ( $ierr != 0 ) {
 
             $cmd = "$cvs -q -d $url login";
             run_command($cmd);
@@ -1269,7 +1269,7 @@ sub handle_svn {
     my $cmd      = '';
     my $user =
       defined( $component{USER} ) ? " --username $component{USER}" : '';
-    my $err  = 0;
+    my $ierr  = 0;
     my $out  = '';
     my $date = defined $DATE ? " -r {$DATE}" : '';
 
@@ -1303,14 +1303,14 @@ sub handle_svn {
 
         # let svn print to stderr to facilitate dealing with
         # server certificate issues
-        ( $err, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
+        ( $ierr, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
         # Check for relocated repositories
         if ($out =~ /^svn: Repository moved permanently to '(.*)'; please relocate$/) {
             my $new_location = $1;
             $cmd = "cd '$target' && $svn checkout --non-interactive $cert_hack $user$date '$new_location' '$dir'";
-            ( $err, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
+            ( $ierr, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
         }
-        if ( $err || $out =~ /^svn/gmi ) {
+        if ( $ierr || $out =~ /^svn/gmi ) {
             my $log = "Could not checkout module $checkout\n";
             $out =~ s/^(?!svn).*$//gmi;
             $out =~ s/\n+/\n/g;
@@ -1319,7 +1319,7 @@ sub handle_svn {
             lock( @components_error );
             push( @components_error, $checkout );
         }
-        return $err;
+        return $ierr;
     }
 
     elsif ( $method eq 'update' ) {
@@ -1328,12 +1328,12 @@ sub handle_svn {
         $cmd = "cd '$target/$dir' && $svn update --non-interactive $cert_hack $date";
 
         print_update_info( $checkout, $url, $target, $name );
-        ( $err, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
+        ( $ierr, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
         # Check for relocated repositories
         if ($out =~ /^svn: Repository moved permanently to '(.*)'; please relocate$/) {
             my $new_location = $1;
             $cmd = "cd '$target/$dir' && $svn info --non-interactive $cert_hack";
-            ( $err, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
+            ( $ierr, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
             $out =~ /^URL: (.*)$/m;
             my $old_location = $1;
             if (!defined($old_location)) {
@@ -1343,15 +1343,15 @@ sub handle_svn {
                 push( @components_error, $checkout );
             } else {
                 $cmd = "cd '$target/$dir' && $svn --non-interactive $cert_hack switch --relocate '$old_location' '$new_location'";
-                ( $err, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
-                if ( $err || $out =~ /^svn/gmi ) {
+                ( $ierr, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
+                if ( $ierr || $out =~ /^svn/gmi ) {
                     WARN("Could not relocate module $checkout");
                     lock( @components_error );
                     push( @components_error, $checkout );
                 }
             }
         }
-        if ( $err || $out =~ /^svn/gmi ) {
+        if ( $ierr || $out =~ /^svn/gmi ) {
             my $log = "Could not update module $checkout\n";
             $out =~ s/^(?!svn).*$//gmi;
             $out =~ s/\n+/\n/g;
@@ -1368,11 +1368,11 @@ sub handle_svn {
             WARN($log);
             lock( @components_error );
             push( @components_error, $checkout );
-            $err = 1;
+            $ierr = 1;
         }
         else {
             $cmd = "cd '$target/$dir' && $svn status --non-interactive $cert_hack ";
-            ( $err, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
+            ( $ierr, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
             if ($out =~ /^[CE]\s+/gm) {
                 my $log = "Module $checkout has conflicts, don't forget to resolve\n";
                 $out =~ s/^(?![CE]).*$//gmi;
@@ -1381,18 +1381,18 @@ sub handle_svn {
                 WARN($log);
                 lock( @components_error );
                 push( @components_error, $checkout );
-                $err = 1;
+                $ierr = 1;
             }
         }
 
-        return $err;
+        return $ierr;
     }
 
     elsif ( $method eq 'status' ) {
 
         my $dir = defined($name) ? $name : $checkout;
         $cmd = "$svn status '$target/$dir'";
-        my ($err, $out ) = run_command($cmd);
+        my ($ierr, $out ) = run_command($cmd);
         $out = filter_status_output($out);
         if ( $out !~ /^$/ ) {
             print "In $target/$dir:\n";
@@ -1405,14 +1405,14 @@ sub handle_svn {
         my $dir = defined($name) ? $name : $checkout;
         $cmd = "$svn diff '$target/$dir'";
 
-        my ($err, $out ) = run_command($cmd);
+        my ($ierr, $out ) = run_command($cmd);
         print $out;
     }
 
     elsif ( $method eq 'authenticate' ) {
 
         $cmd = "$svn info --non-interactive $user $url";
-        $err = run_command($cmd);
+        $ierr = run_command($cmd);
 
         # store username and repo
         save_user( $component{USER},
@@ -1428,23 +1428,23 @@ sub handle_svn {
         my $same_url;
         my $new_url = $url;
         $url =~ s!https?://!!;
-        my ( $err, $out ) = run_command($cmd, $VERBOSE, $bad_cert);
-        return 0 if $err;
+        my ( $ierr, $out ) = run_command($cmd, $VERBOSE, $bad_cert);
+        return 0 if $ierr;
         $out =~ m!<url>(.*)</url>!;
         my $old_url = $1;
         unless ($old_url eq $url) {
             # URL's don't match. try `svn switch`
-            ( $err, $out ) = run_command("$svn --non-interactive $cert_hack switch $new_url '$target/$dir'");
-            if ($err) {
+            ( $ierr, $out ) = run_command("$svn --non-interactive $cert_hack switch $new_url '$target/$dir'");
+            if ($ierr) {
                 # repo might have moved. try `svn switch --relocate`
-                ( $err, $out ) = run_command("$svn --non-interactive $cert_hack switch --relocate $old_url $new_url '$target/$dir'");
+                ( $ierr, $out ) = run_command("$svn --non-interactive $cert_hack switch --relocate $old_url $new_url '$target/$dir'");
                 if ($out =~ /^svn: Repository moved permanently to '(.*)'; please relocate$/) {
                     my $new_location = $1;
-                    if ($new_location eq $old_url) { $err = 0; }
+                    if ($new_location eq $old_url) { $ierr = 0; }
                 }
             }
             # exit code 0 means no error, but 0 is boolean false...
-            return !$err;
+            return !$ierr;
         }
         return 1;
     }
@@ -1490,8 +1490,8 @@ sub handle_git {
         # clone the git repo
         elsif ( !-e $repo_loc ) {
             $cmd = "$git clone$shallow $url '$repo_loc'";
-            my ( $err, $out ) = run_command($cmd);
-            if ($err) {
+            my ( $ierr, $out ) = run_command($cmd);
+            if ($ierr) {
                 my $log = "Could not checkout module $checkout\n";
                 $out =~ s/^(?!fatal).*$//gmi;
                 $out =~ s/\n+/\n/g;
@@ -1499,21 +1499,21 @@ sub handle_git {
                 WARN($log);
                 lock( @components_error );
                 push( @components_error, $checkout );
-                return $err;
+                return $ierr;
             }
             
             # determine if we need a branch or tag checkout
             if ( defined $component{"REPO_BRANCH"} ) {
                 @branches = split(/, /, $component{"REPO_BRANCH"});
-                my ( $err, $out ) = run_command("cd '$repo_loc' && $git tag -l");
-                if ($err) {
+                my ( $ierr, $out ) = run_command("cd '$repo_loc' && $git tag -l");
+                if ($ierr) {
                     my $log = "Could not obtain list of tags in mmodule $checkout\n";
                     $out =~ s/^(?!fatal).*$//gmi;
                     $out =~ s/\n+/\n/g;
                     $log .= $out;
                     WARN($log);
                     push( @components_error, $checkout );
-                    return $err;
+                    return $ierr;
                 }
                 my %tags = map { ($_,1) } split(/\n/, $out);
                 for $branch (@branches) {
@@ -1530,8 +1530,8 @@ sub handle_git {
                             # fix for master branch
                             $cmd = "cd '$repo_loc' && $git checkout master";
                         }
-                        my ( $err, $out ) = run_command($cmd);
-                        if ($err) {
+                        my ( $ierr, $out ) = run_command($cmd);
+                        if ($ierr) {
                             my $new;
                             if ( -e "$repo_loc.branch.failed" ) {
                                 my @times = glob "$repo_loc.branch.failed*";
@@ -1550,12 +1550,12 @@ sub handle_git {
                             WARN($log);
                             lock( @components_error );
                             push( @components_error, $checkout );
-                            return $err;
+                            return $ierr;
                         }
                     } elsif ( defined $tag ) {
                         $cmd = "cd '$repo_loc' && $git checkout -b $tag origin/$tag";
-                        my ( $err, $out ) = run_command($cmd);
-                        if ($err) {
+                        my ( $ierr, $out ) = run_command($cmd);
+                        if ($ierr) {
                             my $new;
                             if ( -e "$repo_loc.branch.failed" ) {
                                 my @times = glob "$repo_loc.branch.failed*";
@@ -1574,7 +1574,7 @@ sub handle_git {
                             WARN($log);
                             lock( @components_error );
                             push( @components_error, $checkout );
-                            return $err;
+                            return $ierr;
                         }
                     }
                 }
@@ -1624,35 +1624,35 @@ sub handle_git {
             }
 
             #return if (-e "$checkout_item");
-            my ( $err, $out ) = run_command($cmd);
-            if ($err) {
+            my ( $ierr, $out ) = run_command($cmd);
+            if ($ierr) {
                 lock( @components_error );
                 push( @components_error, $checkout );
             }
-            return $err;
+            return $ierr;
         }
         elsif ( $checkout eq '.' ) {
 
             # checkout entire repo
             $cmd = "cd '$target_dir' && $ln '$git_repos_dir/$git_repo' '$name'";
             return if ( -e "$target_dir/$name" );
-            my ( $err, $out ) = run_command($cmd);
-            if ($err) {
+            my ( $ierr, $out ) = run_command($cmd);
+            if ($ierr) {
                 lock( @components_error );
                 push( @components_error, $checkout );
             }
-            return $err;
+            return $ierr;
         }
         else {
             $cmd = "cd '$target_dir' && "
               . "$ln '$git_repos_dir/$git_repo/$checkout' '$checkout_item'";
             return if ( -e "$target_dir/$checkout_item" );
-            my ( $err, $out ) = run_command($cmd);
-            if ($err) {
+            my ( $ierr, $out ) = run_command($cmd);
+            if ($ierr) {
                 lock( @components_error );
                 push( @components_error, $checkout );
             }
-            return $err;
+            return $ierr;
         }
     }
 
@@ -1671,9 +1671,9 @@ sub handle_git {
             }
             print_update_info( $checkout, $url, $target, $name );
             
-            my $err = git_stash_update_repo( $git_repo, $repo_loc, $checkout,
+            my $ierr = git_stash_update_repo( $git_repo, $repo_loc, $checkout,
                                              @branches);
-            return $err;
+            return $ierr;
         }
 
         # if git repo has already been updated print update info anyway
@@ -1689,7 +1689,7 @@ sub handle_git {
         # only need to run status once per repo
         return if ${ $updated_git_repos{$git_repo} };
         
-        my ( $err, $out ) = run_command("cd '$repo_loc' && $git status -s");
+        my ( $ierr, $out ) = run_command("cd '$repo_loc' && $git status -s");
         $out = filter_status_output($out);
         if ( $out !~ /^$/ ) {
             print "In $ROOT/repos/$git_repo:\n";
@@ -1704,7 +1704,7 @@ sub handle_git {
         return if ${ $updated_git_repos{$git_repo} };
         
         $cmd = "cd '$repo_loc' && $git diff --exit-code";
-        my ( $err, $out ) = run_command($cmd);
+        my ( $ierr, $out ) = run_command($cmd);
         if ( $out !~ /^$/ ) {
             # help a bit with differentiating between diffs
             print
@@ -1732,7 +1732,7 @@ sub handle_git {
         return 1 if $verified_git_repos{$git_repo};
         
         my $cmd = "cd '$repo_loc' && git config --get remote.origin.url";
-        my ( $err, $out ) = run_command($cmd);
+        my ( $ierr, $out ) = run_command($cmd);
         chomp($out);
         $verified_git_repos{$git_repo} = 1;
         if (! ( $out eq $url )) {
@@ -1747,27 +1747,27 @@ sub git_stash_update_repo {
     my ( $git_repo, $repo_loc, $checkout, @branches ) = @_;
     
     # stash local changes, if necessary
-    my ( $err, $out ) = run_command("cd '$repo_loc' && $git stash save GetComponents-tmp");
-    if ($err) {
+    my ( $ierr, $out ) = run_command("cd '$repo_loc' && $git stash save GetComponents-tmp");
+    if ($ierr) {
         my $logmsg = "Could not update $git_repo. Could not stash local changes. Error message was '$out'.";
         WARN($logmsg);
         ${ $updated_git_repos{$git_repo} } = -1;
         lock( @components_error );
         push( @components_error, $checkout );
-        return $err;
+        return $ierr;
     }
 
     my $ret = git_update_repo($git_repo, $repo_loc, $checkout, @branches);
 
     # pop stash if necessary
-    ( $err, $out ) = run_command("cd '$repo_loc' && if $git stash list | grep -q GetComponents-tmp; then $git stash pop \$($git stash list | grep GetComponents-tmp | sed -e 's/:.*//'); fi");
-    if ($err) {
+    ( $ierr, $out ) = run_command("cd '$repo_loc' && if $git stash list | grep -q GetComponents-tmp; then $git stash pop \$($git stash list | grep GetComponents-tmp | sed -e 's/:.*//'); fi");
+    if ($ierr) {
         my $logmsg = "Could not update $git_repo. Could not pop stashed changes. Error message was '$out'.";
         WARN($logmsg);
         ${ $updated_git_repos{$git_repo} } = -1;
         lock( @components_error );
         push( @components_error, $checkout );
-        return $err;
+        return $ierr;
     }
     return $ret;
 }
@@ -1776,19 +1776,19 @@ sub git_update_repo {
     my ( $git_repo, $repo_loc, $checkout, @branches ) = @_;
 
     # update remote origin to make sure we can see all remote branches
-    my ( $err, $out ) = run_command("cd '$repo_loc' && $git remote update origin");
-    if ($err) {
+    my ( $ierr, $out ) = run_command("cd '$repo_loc' && $git remote update origin");
+    if ($ierr) {
         my $logmsg = "Could not update $git_repo. "
           . "Could not update remote 'origin'.";
         WARN($logmsg);
         ${ $updated_git_repos{$git_repo} } = -1;
         lock( @components_error );
         push( @components_error, $checkout );
-        return $err;
+        return $ierr;
     }
     
     # what branch/tag are we on?
-    ( $err, $out ) = run_command("cd '$repo_loc' && $git branch");
+    ( $ierr, $out ) = run_command("cd '$repo_loc' && $git branch");
     $out =~ /^\*\s*(.*)/m;
     my $current_branch = $1;
     # TODO: this is broken since git does not report "no branch" when on a tag for example
@@ -1810,58 +1810,58 @@ sub git_update_repo {
         if ( `cd '$repo_loc' && $git branch` =~ /$branch/m ) {
             # case 1
             # checkout branch and pull --rebase
-            ( $err, $out ) = run_command(
+            ( $ierr, $out ) = run_command(
                             "cd '$repo_loc' && " .
                             "if [ xrefs/heads/$branch != x`$git symbolic-ref -q HEAD` ] ; then " .
                             "  $git checkout $branch ; " .
                             "fi && " .
                             "$git pull --rebase origin $branch");
-            if ($err) {
+            if ($ierr) {
                 my $logmsg = "Could not update $git_repo. "
                   . "Could not update branch $branch.";
                 WARN($logmsg);
                 ${ $updated_git_repos{$git_repo} } = -1;
                 lock( @components_error );
                 push( @components_error, $checkout );
-                return $err;
+                return $ierr;
             }
         } elsif ( `cd '$repo_loc' && $git branch -r` =~ /$branch/m ) {
             # dealing with a remote tracking branch
-            ( $err, $out ) = run_command(
+            ( $ierr, $out ) = run_command(
                         "cd '$repo_loc' && " .
                         "$git checkout --track -b $branch origin/$branch");
-            if ($err) {
+            if ($ierr) {
                 my $logmsg = "Could not update $git_repo. "
                   . "Could not create local branch for $branch.";
                 WARN($logmsg);
                 ${ $updated_git_repos{$git_repo} } = -1;
                 lock( @components_error );
                 push( @components_error, $checkout );
-                return $err;
+                return $ierr;
             }
         } # no need for else statement, do nothing for tags
     }
     
     # now checkout original branch if required
-    ( $err, $out ) = run_command(
+    ( $ierr, $out ) = run_command(
                 "cd '$repo_loc' && " .
                 "if [ xrefs/heads/$current_branch != x`$git symbolic-ref -q HEAD` ] ; then " .
                 "  $git checkout $current_branch ; " .
                 "fi");
-    if ($err) {
+    if ($ierr) {
         my $logmsg = "Could not update $git_repo. "
           . "Could not checkout original branch.";
         WARN($logmsg);
         ${ $updated_git_repos{$git_repo} } = -1;
         lock( @components_error );
         push( @components_error, $checkout );
-        return $err;
+        return $ierr;
     }
     
     ${ $updated_git_repos{$git_repo} } = 1
       unless ${ $updated_git_repos{$git_repo} } == -1;
     
-    return $err;
+    return $ierr;
 }
 
 sub handle_curl {
@@ -1899,12 +1899,12 @@ sub handle_curl {
             $cmd = "cd '$target' && $curl --location -O $user $url/$checkout";
         }
         print_checkout_info( $checkout, $url, $target, $name );
-        my ( $err, $out ) = run_command($cmd);
-        if ($err) {
+        my ( $ierr, $out ) = run_command($cmd);
+        if ($ierr) {
             lock( @components_error );
             push( @components_error, $checkout );
         }
-        return $err;
+        return $ierr;
     }
 
     elsif ( $method eq 'update' ) {
@@ -1934,15 +1934,15 @@ sub handle_curl {
         my $temp = "$timestamp.$checkout";
         run_command("mv '$target/$checkout' '$target/$temp'");
         print_update_info( $checkout, $url, $target, $name );
-        my ( $err, $out ) = run_command($cmd);
-        if ( $err ) {
+        my ( $ierr, $out ) = run_command($cmd);
+        if ( $ierr ) {
             lock( @components_error );
             push( @components_error, $checkout );
         }
 
         # compare new version, if equivalent delete old
-        ( $err, $out ) = run_command("diff '$target/$checkout' '$target/$temp'");
-        run_command("rm -r '$target/$temp'") unless $err;
+        ( $ierr, $out ) = run_command("diff '$target/$checkout' '$target/$temp'");
+        run_command("rm -r '$target/$temp'") unless $ierr;
     }
 
     elsif ( $method eq 'status' ) {
@@ -2000,8 +2000,8 @@ sub handle_darcs {
         elsif ( !-e $repo_loc ) {
             $cmd = "$darcs get$shallow$tag $url '$repo_loc'";
             print_checkout_info( $checkout, $url, $target, $name );
-            my ( $err, $out ) = run_command($cmd);
-            if ($err) {
+            my ( $ierr, $out ) = run_command($cmd);
+            if ($ierr) {
                 my $log = "Could not checkout module $checkout\n";
                 $out =~ s/^(?!darcs).*$//gmi;
                 $out =~ s/\n+/\n/g;
@@ -2009,7 +2009,7 @@ sub handle_darcs {
                 WARN($log);
                 lock( @components_error );
                 push( @components_error, $checkout );
-                return $err;
+                return $ierr;
             }
             ${ $updated_darcs_repos{$darcs_repo} } = 1;
         }
@@ -2019,8 +2019,8 @@ sub handle_darcs {
         elsif ( ${ $updated_darcs_repos{$darcs_repo} } == 0 ) {
 
             print_checkout_info( $checkout, $url, $target, $name );
-            my ( $err, $out ) = run_command("$darcs pull$tag --repodir='$repo_loc'");
-            if ($err) {
+            my ( $ierr, $out ) = run_command("$darcs pull$tag --repodir='$repo_loc'");
+            if ($ierr) {
                 my $log = "Could not checkout module $checkout\n";
                 $out =~ s/^(?!darcs).*$//gmi;
                 $out =~ s/\n+/\n/g;
@@ -2028,7 +2028,7 @@ sub handle_darcs {
                 WARN($log);
                 lock( @components_error );
                 push( @components_error, $checkout );
-                return $err;
+                return $ierr;
             }
             ${ $updated_darcs_repos{$darcs_repo} } = 1;
         }
@@ -2073,12 +2073,12 @@ sub handle_darcs {
                   . "'$checkout_item'";
             }
 
-            my ( $err, $out ) = run_command($cmd);
-            if ($err) {
+            my ( $ierr, $out ) = run_command($cmd);
+            if ($ierr) {
                 lock( @components_error );
                 push( @components_error, $checkout );
             }
-            return $err;
+            return $ierr;
         }
         elsif ( $checkout eq '.' ) {
 
@@ -2086,24 +2086,24 @@ sub handle_darcs {
             $cmd =
               "cd '$target_dir' && " . "$ln '$darcs_repos_dir/$darcs_repo' '$name'";
             return if ( -e "$target_dir/$name" );
-            my ( $err, $out ) = run_command($cmd);
-            if ($err) {
+            my ( $ierr, $out ) = run_command($cmd);
+            if ($ierr) {
                 lock( @components_error );
                 push( @components_error, $checkout );
             }
-            return $err;
+            return $ierr;
         }
         else {
             $cmd = "cd '$target_dir' && "
               . "$ln '$darcs_repos_dir/$darcs_repo/$checkout' '$checkout_item'";
             return if ( -e "$target_dir/$checkout_item" );
-            my ( $err, $out ) = run_command($cmd);
-            if ($err) {
+            my ( $ierr, $out ) = run_command($cmd);
+            if ($ierr) {
                 lock( @components_error );
                 push( @components_error, $checkout );
             }
 
-            return $err;
+            return $ierr;
         }
     }
 
@@ -2118,8 +2118,8 @@ sub handle_darcs {
             }
 
             print_update_info( $checkout, $url, $target, $name );
-            my ( $err, $out ) = run_command("$darcs pull$tag --repodir='$repo_loc'");
-            if ($err) {
+            my ( $ierr, $out ) = run_command("$darcs pull$tag --repodir='$repo_loc'");
+            if ($ierr) {
                 my $log = "Could not update module $checkout\n";
                 $out =~ s/^(?!darcs).*$//gmi;
                 $out =~ s/\n+/\n/g;
@@ -2130,7 +2130,7 @@ sub handle_darcs {
             }
             ${ $updated_darcs_repos{$darcs_repo} } = 1;
 
-            return $err;
+            return $ierr;
         }
 
         # if darcs repo has already been updated print update info anyway
@@ -2142,7 +2142,7 @@ sub handle_darcs {
 
         return if ${ $updated_darcs_repos{$darcs_repo} };
         my $cmd = "cd '$repo_loc' && $darcs whatsnew";
-        my ( $err, $out ) = run_command($cmd);
+        my ( $ierr, $out ) = run_command($cmd);
         $out = filter_status_output($out);
         if ( $out !~ /^$/ ) {
             print "In $ROOT/repos/$darcs_repo:\n";
@@ -2155,7 +2155,7 @@ sub handle_darcs {
 
         return if ${ $updated_darcs_repos{$darcs_repo} };
         $cmd = "cd '$repo_loc' && $darcs diff -u";
-        my ( $err, $out ) = run_command($cmd);
+        my ( $ierr, $out ) = run_command($cmd);
         $out =~ s!^--- a/!--- a/$ROOT/repos/$darcs_repo/!gm;
         $out =~ s!^\+\+\+ b/!\+\+\+ b/$ROOT/repos/$darcs_repo/!gm;
         print $out;
@@ -2168,7 +2168,7 @@ sub handle_darcs {
         return 1 if $verified_darcs_repos{$darcs_repo};
 
         my $cmd = "cd '$repo_loc' && $darcs show repo --no-files";
-        my ( $err, $out ) = run_command($cmd);
+        my ( $ierr, $out ) = run_command($cmd);
         $verified_darcs_repos{$darcs_repo} = 1;
         return ( $out =~ /Default Remote: $url/ );
     }
@@ -2221,8 +2221,8 @@ sub handle_wget {
             $cmd = "cd '$target' && $wget $user $pass $url/$checkout";
         }
         print_checkout_info( $checkout, $url, $target, $name );
-        my ( $err, $out ) = run_command($cmd);
-        if ( $err ) {
+        my ( $ierr, $out ) = run_command($cmd);
+        if ( $ierr ) {
             lock( @components_error );
             push( @components_error, $checkout );
         }
@@ -2255,15 +2255,15 @@ sub handle_wget {
         my $temp = "$timestamp.$checkout";
         run_command("mv '$target/$checkout' '$target/$temp'");
         print_update_info( $checkout, $url, $target, $name );
-        my ( $err, $out ) = run_command($cmd);
-        if ( $err ) {
+        my ( $ierr, $out ) = run_command($cmd);
+        if ( $ierr ) {
             lock( @components_error );
             push( @components_error, $checkout );
         }
 
         # compare new version, if equivalent delete old
-        ( $err, $out ) = run_command("diff '$target/$checkout' '$target/$temp'");
-        run_command("rm -r '$target/$temp'") unless $err;
+        ( $ierr, $out ) = run_command("diff '$target/$checkout' '$target/$temp'");
+        run_command("rm -r '$target/$temp'") unless $ierr;
     }
 
     elsif ( $method eq 'status' ) {
@@ -2318,8 +2318,8 @@ sub handle_hg {
 
             $cmd = "$hg clone $url '$repo_loc'";
             print_checkout_info( $checkout, $url, $target, $name );
-            my ( $err, $out ) = run_command($cmd);
-            if ($err) {
+            my ( $ierr, $out ) = run_command($cmd);
+            if ($ierr) {
                 my $log = "Could not checkout module $checkout\n";
                 $out =~ s/^(?!abort).*$//gmi;
                 $out =~ s/\n+/\n/g;
@@ -2327,13 +2327,13 @@ sub handle_hg {
                 WARN($log);
                 lock( @components_error );
                 push( @components_error, $checkout );
-                return $err;
+                return $ierr;
             }
             if ( defined($branch) ) {
 
-                my ( $err, $out ) =
+                my ( $ierr, $out ) =
                   run_command("hg --repository '$repo_loc' checkout $branch");
-                if ($err) {
+                if ($ierr) {
                     my $new;
                     if ( -e "$repo_loc.branch.failed" ) {
                         my @times = glob "$repo_loc.branch.failed*";
@@ -2351,15 +2351,15 @@ sub handle_hg {
                     WARN($log);
                     lock( @components_error );
                     push( @components_error, $checkout );
-                    return $err;
+                    return $ierr;
                 }
             }
             if ( defined $date ) {
 
                 #chdir("$hg_repo");
-                my ( $err, $out ) = run_command(
+                my ( $ierr, $out ) = run_command(
                     "hg --repository '$repo_loc' checkout --date $date");
-                if ($err) {
+                if ($ierr) {
                     my $new;
                     if ( -e "$repo_loc.date.failed" ) {
                         my @times = glob "$repo_loc.date.failed*";
@@ -2377,7 +2377,7 @@ sub handle_hg {
                     WARN($log);
                     lock( @components_error );
                     push( @components_error, $checkout );
-                    return $err;
+                    return $ierr;
                 }
             }
             ${ $updated_hg_repos{$hg_repo} } = 1;
@@ -2388,8 +2388,8 @@ sub handle_hg {
         elsif ( ${ $updated_hg_repos{$hg_repo} } == 0 ) {
 
             print_checkout_info( $checkout, $url, $target, $name );
-            my ( $err, $out ) = run_command("$hg --repository '$repo_loc' pull");
-            if ($err) {
+            my ( $ierr, $out ) = run_command("$hg --repository '$repo_loc' pull");
+            if ($ierr) {
                 my $log = "Could not checkout module $checkout\n";
                 $out =~ s/^(?!abort).*$//gmi;
                 $out =~ s/\n+/\n/g;
@@ -2397,7 +2397,7 @@ sub handle_hg {
                 WARN($log);
                 lock( @components_error );
                 push( @components_error, $checkout );
-                return $err;
+                return $ierr;
             }
             ${ $updated_hg_repos{$hg_repo} } = 1;
         }
@@ -2442,39 +2442,39 @@ sub handle_hg {
                   . "'$checkout_item'";
             }
 
-            my ( $err, $out ) = run_command($cmd);
-            if ($err) {
+            my ( $ierr, $out ) = run_command($cmd);
+            if ($ierr) {
                 lock( @components_error );
                 push( @components_error, $checkout );
             }
-            return $err;
+            return $ierr;
         }
         elsif ( $checkout eq '.' ) {
 
             # checkout entire repo
             $cmd = "cd '$target_dir' && " . "$ln '$hg_repos_dir/$hg_repo' '$name'";
-            my ($err, $out) = (0, "");
+            my ($ierr, $out) = (0, "");
             if ( not -e "$target_dir/$name" ) {
-                ( $err, $out ) = run_command($cmd);
-                if ($err) {
+                ( $ierr, $out ) = run_command($cmd);
+                if ($ierr) {
                     lock( @components_error );
                     push( @components_error, $checkout );
                 }
             }
-            return $err;
+            return $ierr;
         }
         else {
             $cmd = "cd '$target_dir' && "
               . "$ln '$hg_repos_dir/$hg_repo/$checkout' '$checkout_item'";
-            my ($err, $out) = (0, "");
+            my ($ierr, $out) = (0, "");
             if ( not -e "$target_dir/$checkout_item" ) {
-                ( $err, $out ) = run_command($cmd);
-                if ($err) {
+                ( $ierr, $out ) = run_command($cmd);
+                if ($ierr) {
                     lock( @components_error );
                     push( @components_error, $checkout );
                 }
             }
-            return $err;
+            return $ierr;
         }
     }
 
@@ -2489,9 +2489,9 @@ sub handle_hg {
             }
 
             print_update_info( $checkout, $url, $target, $name );
-            my ( $err, $out ) =
+            my ( $ierr, $out ) =
               run_command("$hg --repository '$repo_loc' pull --update");
-            if ($err) {
+            if ($ierr) {
                 my $log = "Could not update module $checkout\n";
                 $out =~ s/^(?!abort).*$//gmi;
                 $out =~ s/\n+/\n/g;
@@ -2501,7 +2501,7 @@ sub handle_hg {
                 push( @components_error, $checkout );
             }
             ${ $updated_hg_repos{$hg_repo} } = 1;
-            return $err;
+            return $ierr;
         }
 
         # if hg repo has already been updated print update info anyway
@@ -2513,7 +2513,7 @@ sub handle_hg {
         
         return if ${ $updated_hg_repos{$hg_repo} };
         my $cmd = "cd '$repo_loc' && $hg status";
-        my ( $err, $out ) = run_command($cmd);
+        my ( $ierr, $out ) = run_command($cmd);
         $out = filter_status_output($out);
         if ( $out !~ /^$/ ) {
             print "In $ROOT/repos/$hg_repo:\n";
@@ -2528,7 +2528,7 @@ sub handle_hg {
         return if ${ $updated_hg_repos{$hg_repo} };
 
         $cmd = "cd '$repo_loc' && $hg diff";
-        my ( $err, $out ) = run_command($cmd);
+        my ( $ierr, $out ) = run_command($cmd);
         if ( $out !~ /^$/ ) {
             # help a bit with differentiating between diffs
             print
@@ -2555,7 +2555,7 @@ sub handle_hg {
         return 1 if $verified_hg_repos{$hg_repo};
 
         my $cmd = "cd '$repo_loc' && $hg showconfig paths.default";
-        my ( $err, $out ) = run_command($cmd);
+        my ( $ierr, $out ) = run_command($cmd);
         $verified_hg_repos{$hg_repo} = 1;
         # match against either anonymous or authenticated URL, assuming
         # both point to actually the same repository
