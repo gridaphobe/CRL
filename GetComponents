@@ -472,13 +472,14 @@ sub parse_list {
             print "Please enter the path to cvs: ";
             $cvs = <STDIN>;
             chomp $cvs;
-
-            # verify that we actually have cvs now...
-            my $ret = system "$cvs --version >/dev/null 2>&1";
-            if ($ret) {
-                DIE("$cvs does not appear to be a working copy of cvs!");
+            if ( $cvs ) {
+                # verify that we actually have cvs now...
+                my $ret = system "$cvs --version >/dev/null 2>&1";
+                if ($ret) {
+                    DIE("$cvs does not appear to be a working copy of cvs!");
+                }
+                else { $cvs_found = 1 }
             }
-            else { $cvs_found = 1 }
         }
         if ( ( $rec{"TYPE"} eq "svn" ) && ( !$svn_found ) ) {
             print "You have requested a subversion checkout, "
@@ -486,13 +487,14 @@ sub parse_list {
             print "Please enter the path to subversion: ";
             $svn = <STDIN>;
             chomp $svn;
-
-            # verify that we actually have svn now...
-            my $ret = system "$svn --version >/dev/null 2>&1";
-            if ($ret) {
-                DIE("$svn does not appear to be a working copy of svn!");
+            if ( $svn ) {
+                # verify that we actually have svn now...
+                my $ret = system "$svn --version >/dev/null 2>&1";
+                if ($ret) {
+                    DIE("$svn does not appear to be a working copy of svn!");
+                }
+                else { $svn_found = 1 }
             }
-            else { $svn_found = 1 }
         }
         if ( ( $rec{"TYPE"} eq "git" ) && ( !$git_found ) ) {
             print "You have requested a git checkout, "
@@ -500,13 +502,14 @@ sub parse_list {
             print "Please enter the path to git: ";
             $git = <STDIN>;
             chomp $git;
-
-            # verify that we actually have git now...
-            my $ret = system "$git --version >/dev/null 2>&1";
-            if ($ret) {
-                DIE("$git does not appear to be a working copy of git!");
+            if ( $git ) {
+                # verify that we actually have git now...
+                my $ret = system "$git --version >/dev/null 2>&1";
+                if ($ret) {
+                    DIE("$git does not appear to be a working copy of git!");
+                }
+                else { $git_found = 1 }
             }
-            else { $git_found = 1 }
         }
         if ( ( $rec{"TYPE"} eq ( "http" or "https" ) )
             && !( $wget_found || $curl_found ) )
@@ -526,7 +529,7 @@ sub parse_list {
                 }
                 else { $curl_found = 1 }
             }
-            else {
+            elsif ( $path ) {
                 $wget = $path;
 
                 # verify that we actually have wget now...
@@ -543,13 +546,14 @@ sub parse_list {
             print "Please enter the path to darcs: ";
             $darcs = <STDIN>;
             chomp $darcs;
-
-            # verify that we actually have darcs now...
-            my $ret = system "$darcs --version >/dev/null 2>&1";
-            if ($ret) {
-                DIE("$darcs does not appear to be a working copy of darcs!");
+            if ( $darcs ) {
+                # verify that we actually have darcs now...
+                my $ret = system "$darcs --version >/dev/null 2>&1";
+                if ($ret) {
+                    DIE("$darcs does not appear to be a working copy of darcs!");
+                }
+                else { $darcs_found = 1 }
             }
-            else { $darcs_found = 1 }
         }
         if ( ( $rec{"TYPE"} eq "hg" ) && ( !$hg_found ) ) {
             print "You have requested an hg checkout, "
@@ -557,13 +561,14 @@ sub parse_list {
             print "Please enter the path to hg: ";
             $hg = <STDIN>;
             chomp $hg;
-
-            # verify that we actually have hg now...
-            my $ret = system "$hg --version >/dev/null 2>&1";
-            if ($ret) {
-                DIE("$hg does not appear to be a working copy of hg!");
+            if ( $darcs ) {
+                # verify that we actually have hg now...
+                my $ret = system "$hg --version >/dev/null 2>&1";
+                if ($ret) {
+                    DIE("$hg does not appear to be a working copy of hg!");
+                }
+                else { $hg_found = 1 }
             }
-            else { $hg_found = 1 }
         }
         $|--;
 
