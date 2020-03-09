@@ -1734,11 +1734,29 @@ sub handle_git {
         my $cmd = "cd '$repo_loc' && git config --get remote.origin.url";
         my ( $ierr, $out ) = run_command($cmd);
         chomp($out);
+        my $new_url = $out;
         $verified_git_repos{$git_repo} = 1;
-        if (! ( $out eq $url )) {
+
+        # try and get a "canonical" URL by looking only at the host and repo
+        # part but not the transport or user name
+        my $canonize_url = sub {
+            my ($url) = @_;
+            # TODO: this does not cover all options, missing is eg: port number
+            # for https, ssh:// transport, ...
+            if ($url =~ m!https?://(?:\w+\@)?([^/]+)/(.*)!) {
+                return "$1/$2";
+            } elsif ($url =~ m!\w+@([^:]+):(.*)!) {
+                return "$1/$2";
+            } else {
+                return $url;
+            }
+        };
+        $url = &$canonize_url($url);
+        $new_url = &$canonize_url($new_url);
+        if (! ( $new_url eq $url )) {
             WARN("git::verify_url: URLs do not match. Stored URL: <$url>, current URL: <$out>");
         }
-        return ( $out eq $url );
+        return ( $new_url eq $url );
     }
     else { DIE("Unrecognized checkout method: $method") }
 }
