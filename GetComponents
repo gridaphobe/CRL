@@ -258,8 +258,12 @@ sub download_list {
     if ($curl_found) {
         system("$curl --location --silent '$url' -o $file") == 0 and return;
     }
-    system("$wget --quiet '$url' -O $file") == 0 and return;
-    DIE("Couldn't download $url correctly.");
+    if ((   !$curl_found
+         or (run_command("$curl --location '$url' -o '$file'"))[0])
+        and (run_command("$wget '$url' -O '$file'"))[0] )
+    {
+        DIE("Couldn't download url $url correctly\n");
+    }
 }
 
 sub find_tools {
