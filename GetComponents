@@ -1743,7 +1743,7 @@ sub handle_git {
             my ($url) = @_;
             # TODO: this does not cover all options, missing is eg: port number
             # for https, ssh:// transport, ...
-            if ($url =~ m!https?://(?:\w+\@)?([^/]+)/(.*)!) {
+            if ($url =~ m!(?:https?://|git://)?(?:\w+\@)?([^/]+)/(.*)!) {
                 return "$1/$2";
             } elsif ($url =~ m!\w+@([^:]+):(.*)!) {
                 return "$1/$2";
