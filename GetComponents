@@ -148,7 +148,7 @@ GetOptions(
     'experimental'         => \$EXPERIMENTAL,
     'status'               => \$STATUS,
     'diff'                 => \$DIFF,
-    'parallel'             => \$PARALLEL,
+    'parallel!'            => \$PARALLEL,
     'shallow!'             => \$SHALLOW_CLONE,
     'reset-authentication' => sub { system("rm $crl_dir/users") }
 ) or pod2usage(2);
@@ -2763,7 +2763,7 @@ Options:
 
     --debug         print all commands to be executed and exit
 
-    --parallel      checkout/update components in parallel
+    --[no]parallel  checkout/update components in parallel
 
     --anonymous     use anonymous checkout for all components
 
