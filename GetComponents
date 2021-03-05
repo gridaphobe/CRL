@@ -79,7 +79,7 @@ my $HELP               = 0;
 my $MAN                = 0;
 my $EXPERIMENTAL       = 0;
 my $ANONYMOUS_CHECKOUT = 1;
-my $DO_UPDATES         = undef;
+my $DO_UPDATES         = 0;
 my $STATUS             = 0;
 my $DIFF               = 0;
 my $SHALLOW_CLONE      = 0;
@@ -142,7 +142,7 @@ GetOptions(
     'man'                  => \$MAN,
     'debug'                => \$DEBUG,
     'anonymous!'           => \$ANONYMOUS_CHECKOUT,
-    'update!'              => \$DO_UPDATES,
+    'update'               => \$DO_UPDATES,
     'root=s'               => \$ROOT,
     'date=s'               => \$DATE,
     'experimental'         => \$EXPERIMENTAL,
@@ -995,9 +995,9 @@ sub find_user {
 
 sub prompt_for_update {
 
-    # if update has been specified from the cmd line there's no need to bother
-    # the user
-    return if defined($DO_UPDATES);
+    # if updates have been specified from the cmd line there's no need
+    # to bother the user
+    return if $DO_UPDATES == 1;
 
     # if there are no components to update there's no reason to ask..
     return unless scalar( values %components_to_update );
@@ -1013,11 +1013,7 @@ sub prompt_for_update {
       print "Not updating existing components. If you want an update, re-run with --update\n";
     }
     $|--;
-    if ( $answer =~ /^[yY]/ ) {
-      $DO_UPDATES = 1;
-    } else {
-      $DO_UPDATES = 0;
-    }
+    $DO_UPDATES = 1 if ( $answer =~ /^[yY]/ );
 }
 
 sub process_components {
@@ -2771,7 +2767,7 @@ Options:
 
     --[no]anonymous use anonymous checkout for all components
 
-    --[no]update    process all updates
+    --update        process all updates
 
     --status        run status commands for each component
 
