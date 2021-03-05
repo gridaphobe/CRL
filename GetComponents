@@ -2769,7 +2769,7 @@ Options:
 
     --[no]parallel  checkout/update components in parallel
 
-    --anonymous     use anonymous checkout for all components
+    --[no]anonymous use anonymous checkout for all components
 
     --[no]update    process all updates
 
