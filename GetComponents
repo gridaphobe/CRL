@@ -2730,7 +2730,12 @@ sub LOG {
     }
     open( my $logfile, '>>', "$crl_dir/crl.log" ) or die $!;
     my $timestamp = strftime "%b %e %H:%M:%S %Y", localtime;
-    print {$logfile} "$timestamp:\t$log\n" or die $!;
+    # avoid issues with error messages containing strings with unknown
+    # encodings by copying them verbatim
+    binmode($logfile, ":raw");
+    print {$logfile} "$timestamp:\t$log" or die $!;
+    binmode($logfile, ":pop");
+    print {$logfile} "\n" or die $!;
     close $logfile or die $!;
 }
 
