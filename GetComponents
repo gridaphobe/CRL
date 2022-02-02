@@ -82,7 +82,7 @@ my $ANONYMOUS_CHECKOUT = 1;
 my $DO_UPDATES         = undef;
 my $STATUS             = 0;
 my $DIFF               = 0;
-my $SHALLOW_CLONE      = 0;
+my $SHALLOW_CLONE      = 1;
 my $DATE;
 my @CRL_LISTS;
 my @ORIG_LISTS;
@@ -1497,7 +1497,16 @@ sub handle_git {
 
         # clone the git repo
         elsif ( !-e $repo_loc ) {
-            $cmd = "$git clone$shallow $url '$repo_loc'";
+            my $branch_opts = "";
+            if ( scalar @branches == 1 ) {
+                $branch_opts = " --branch '$branches[0]'";
+            }
+            die "Error: Multiple branch checkout is no longer supported" if(scalar @branches > 1);
+            print "SHALLOW_CLONE $SHALLOW_CLONE\n";
+            if ( $SHALLOW_CLONE > 0 ) {
+                $branch_opts .= " --single-branch";
+            }
+            $cmd = "$git clone$shallow$branch_opts $url '$repo_loc'";
             my ( $ierr, $out ) = run_command($cmd);
             if ($ierr) {
                 my $log = "Could not checkout module $checkout\n";
@@ -1510,83 +1519,6 @@ sub handle_git {
                 return $ierr;
             }
             
-            # determine if we need a branch or tag checkout
-            if ( defined $component{"REPO_BRANCH"} ) {
-                @branches = split(/, /, $component{"REPO_BRANCH"});
-                my ( $ierr, $out ) = run_command("cd '$repo_loc' && $git tag -l");
-                if ($ierr) {
-                    my $log = "Could not obtain list of tags in mmodule $checkout\n";
-                    $out =~ s/^(?!fatal).*$//gmi;
-                    $out =~ s/\n+/\n/g;
-                    $log .= $out;
-                    WARN($log);
-                    push( @components_error, $checkout );
-                    return $ierr;
-                }
-                my %tags = map { ($_,1) } split(/\n/, $out);
-                for $branch (@branches) {
-                    # determine if $branch is actually a tag
-                    if ( exists $tags{$branch} ) {
-                        $tag = $branch;
-                        $branch = undef;
-                    }
-            
-                    if ( defined $branch ) {
-                        $cmd = "cd '$repo_loc' && "
-                          . "$git checkout --track -b $branch origin/$branch";
-                        if ( $branch eq 'master' ) {
-                            # fix for master branch
-                            $cmd = "cd '$repo_loc' && $git checkout master";
-                        }
-                        my ( $ierr, $out ) = run_command($cmd);
-                        if ($ierr) {
-                            my $new;
-                            if ( -e "$repo_loc.branch.failed" ) {
-                                my @times = glob "$repo_loc.branch.failed*";
-                                $new = "$repo_loc.branch.failed."
-                                        . scalar @times;
-                            } else {
-                                $new = "$repo_loc.branch.failed"
-                            }
-                            run_command("mv '$repo_loc' '$new'");
-                            ${ $updated_git_repos{$git_repo} } = -1;
-                            my $log =
-                                "Could not checkout $checkout, "
-                              . "unable to switch to branch $branch. "
-                              . "Any existing symlinks to $checkout will be "
-                              . "broken";
-                            WARN($log);
-                            lock( @components_error );
-                            push( @components_error, $checkout );
-                            return $ierr;
-                        }
-                    } elsif ( defined $tag ) {
-                        $cmd = "cd '$repo_loc' && $git checkout -b $tag origin/$tag";
-                        my ( $ierr, $out ) = run_command($cmd);
-                        if ($ierr) {
-                            my $new;
-                            if ( -e "$repo_loc.branch.failed" ) {
-                                my @times = glob "$repo_loc.branch.failed*";
-                                $new = "$repo_loc.branch.failed."
-                                        . scalar @times;
-                            } else {
-                                $new = "$repo_loc.branch.failed"
-                            }
-                            run_command("mv '$repo_loc' '$new'");
-                            ${ $updated_git_repos{$git_repo} } = -1;
-                            my $log =
-                                "Could not checkout $checkout, "
-                              . "unable to switch to tag $branch. "
-                              . "Any existing symlinks to $checkout will be "
-                              . "broken";
-                            WARN($log);
-                            lock( @components_error );
-                            push( @components_error, $checkout );
-                            return $ierr;
-                        }
-                    }
-                }
-            }
             ${ $updated_git_repos{$git_repo} } = 1;
         }
 
