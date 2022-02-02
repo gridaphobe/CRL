@@ -82,7 +82,7 @@ my $ANONYMOUS_CHECKOUT = 1;
 my $DO_UPDATES         = 0;
 my $STATUS             = 0;
 my $DIFF               = 0;
-my $SHALLOW_CLONE      = 0;
+my $SHALLOW_CLONE      = 1;
 my $DATE;
 my @CRL_LISTS;
 my @ORIG_LISTS;
@@ -1493,7 +1493,15 @@ sub handle_git {
 
         # clone the git repo
         elsif ( !-e $repo_loc ) {
-            $cmd = "$git clone$shallow $url '$repo_loc'";
+            my $branch_opts = "";
+            if ( $#branches == 0 ) {
+                $branch_opts = " --branch '$branches[0]'";
+            }
+            die "Error: Multiple branch checkout is no longer supported" if($#branches > 0);
+            if ( $SHALLOW_CLONE and $#branches <= 0) {
+                $branch_opts .= " --single-branch";
+            }
+            $cmd = "$git clone$shallow$branch_opts $url '$repo_loc'";
             my ( $ierr, $out ) = run_command($cmd);
             if ($ierr) {
                 my $log = "Could not checkout module $checkout\n";
