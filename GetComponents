@@ -1494,11 +1494,12 @@ sub handle_git {
         # clone the git repo
         elsif ( !-e $repo_loc ) {
             my $branch_opts = "";
-            if ( $#branches == 0 ) {
+            if ( scalar @branches == 1 ) {
                 $branch_opts = " --branch '$branches[0]'";
             }
-            die "Error: Multiple branch checkout is no longer supported" if($#branches > 0);
-            if ( $SHALLOW_CLONE and $#branches <= 0) {
+            die "Error: Multiple branch checkout is no longer supported" if(scalar @branches > 1);
+            print "SHALLOW_CLONE $SHALLOW_CLONE\n";
+            if ( $SHALLOW_CLONE > 0 ) {
                 $branch_opts .= " --single-branch";
             }
             $cmd = "$git clone$shallow$branch_opts $url '$repo_loc'";
