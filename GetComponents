@@ -1502,7 +1502,6 @@ sub handle_git {
                 $branch_opts = " --branch '$branches[0]'";
             }
             die "Error: Multiple branch checkout is no longer supported" if(scalar @branches > 1);
-            print "SHALLOW_CLONE $SHALLOW_CLONE\n";
             if ( $SHALLOW_CLONE > 0 ) {
                 $branch_opts .= " --single-branch";
             }
