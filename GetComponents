@@ -895,7 +895,7 @@ sub write_componentlist_target {
 }
 
 sub process_users {
-    my $user = $ENV{USER};
+    my $user = getpwuid($<);
     my $last = $user;
     foreach my $component (@all_components) {
 
