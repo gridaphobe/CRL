@@ -1542,8 +1542,8 @@ sub handle_git {
 
         # get relative path from target directory to directory containing the
         # repositories
-        $git_repos_dir = File::Spec->abs2rel( "$ROOT/repos",
-            "$target_dir" );
+        $git_repos_dir = File::Spec->abs2rel( realpath("$ROOT/repos"),
+            realpath($target_dir) );
 
         # now we create a symlink from the repo to the appropriate target
         if ( defined($repo_path) ) {
@@ -2010,8 +2010,8 @@ sub handle_darcs {
 
         # get relative path from target directory to directory containing the
         # repositories
-        $darcs_repos_dir = File::Spec->abs2rel( "$ROOT/repos",
-            "$target_dir" );
+        $darcs_repos_dir = File::Spec->abs2rel( realpath("$ROOT/repos"),
+            realpath($target_dir) );
 
         # now we create a symlink from the repo to the appropriate target
         if ( defined($repo_path) ) {
@@ -2379,8 +2379,8 @@ sub handle_hg {
 
         # get relative path from target directory to directory containing the
         # repositories
-        $hg_repos_dir = File::Spec->abs2rel( "$ROOT/repos",
-            "$target_dir" );
+        $hg_repos_dir = File::Spec->abs2rel( realpath("$ROOT/repos"),
+            realpath($target_dir) );
 
         # now we create a symlink from the repo to the appropriate target
         if ( defined($repo_path) ) {
