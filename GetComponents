@@ -1311,12 +1311,12 @@ sub handle_svn {
 
         # let svn print to stderr to facilitate dealing with
         # server certificate issues
-        ( $ierr, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
+        ( $ierr, $out ) = run_command( $cmd, $bad_cert );
         # Check for relocated repositories
         if ($out =~ /^svn: Repository moved permanently to '(.*)'; please relocate$/) {
             my $new_location = $1;
             $cmd = "cd '$target' && $svn checkout --non-interactive $cert_hack $user$date '$new_location' '$dir'";
-            ( $ierr, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
+            ( $ierr, $out ) = run_command( $cmd, $bad_cert );
         }
         if ( $ierr || $out =~ /^svn/gmi ) {
             my $log = "Could not checkout module $checkout\n";
@@ -1336,12 +1336,12 @@ sub handle_svn {
         $cmd = "cd '$target/$dir' && $svn update --non-interactive $cert_hack $date";
 
         print_update_info( $checkout, $url, $target, $name );
-        ( $ierr, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
+        ( $ierr, $out ) = run_command( $cmd, $bad_cert );
         # Check for relocated repositories
         if ($out =~ /^svn: Repository moved permanently to '(.*)'; please relocate$/) {
             my $new_location = $1;
             $cmd = "cd '$target/$dir' && $svn info --non-interactive $cert_hack";
-            ( $ierr, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
+            ( $ierr, $out ) = run_command( $cmd, $bad_cert );
             $out =~ /^URL: (.*)$/m;
             my $old_location = $1;
             if (!defined($old_location)) {
@@ -1351,7 +1351,7 @@ sub handle_svn {
                 push( @components_error, $checkout );
             } else {
                 $cmd = "cd '$target/$dir' && $svn --non-interactive $cert_hack switch --relocate '$old_location' '$new_location'";
-                ( $ierr, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
+                ( $ierr, $out ) = run_command( $cmd, $bad_cert );
                 if ( $ierr || $out =~ /^svn/gmi ) {
                     WARN("Could not relocate module $checkout");
                     lock( @components_error );
@@ -1380,7 +1380,7 @@ sub handle_svn {
         }
         else {
             $cmd = "cd '$target/$dir' && $svn status --non-interactive $cert_hack ";
-            ( $ierr, $out ) = run_command( $cmd, $VERBOSE, $bad_cert );
+            ( $ierr, $out ) = run_command( $cmd, $bad_cert );
             if ($out =~ /^[CE]\s+/gm) {
                 my $log = "Module $checkout has conflicts, don't forget to resolve\n";
                 $out =~ s/^(?![CE]).*$//gmi;
@@ -1436,7 +1436,7 @@ sub handle_svn {
         my $same_url;
         my $new_url = $url;
         $url =~ s!https?://!!;
-        my ( $ierr, $out ) = run_command($cmd, $VERBOSE, $bad_cert);
+        my ( $ierr, $out ) = run_command($cmd, $bad_cert);
         return 0 if $ierr;
         $out =~ m!<url>(.*)</url>!;
         my $old_url = $1;
@@ -2527,16 +2527,11 @@ sub handle_hg {
 sub run_command {
 
     # run a command through the shell and return the exit code and output.
-    # can optionally override the global verbose setting and elect to let
-    # the command print to stderr (this is useful in some cases, i.e. svn
-    # will print to stderr and block if the SSL certificate is not trusted)
     my $command          = shift;
-    my $VERBOSE_OVERRIDE = shift;
     my $show_err         = shift;
-    my $verbose = defined $VERBOSE_OVERRIDE ? $VERBOSE_OVERRIDE : $VERBOSE;
     my $err = $show_err ? '' : '2>&1';
     if ( $command =~ /^$/ ) { return }
-    if ($verbose) {
+    if ($VERBOSE) {
 
         if ( $command =~ /^cd (.*) \&\& (.*)$/ ) {
             my ( $cmd, $loc ) = ( $2, $1 );
@@ -2548,7 +2543,7 @@ sub run_command {
     my $out = "";
     if (not $DEBUG) { $out = `$command $err`; }
     my $ret = $?;
-    print $out if $verbose;
+    print $out if $VERBOSE;
     return ( $ret, $out );
 }
 
