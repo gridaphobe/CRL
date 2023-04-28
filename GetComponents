@@ -39,6 +39,7 @@ use Getopt::Long;
 use Pod::Usage;
 use File::stat;
 use File::Spec;
+use Cwd qw(realpath);
 use Term::ANSIColor qw(:constants);
 use POSIX qw(strftime);
 
@@ -1173,12 +1174,12 @@ sub handle_cvs {
             my $tmpdir = ".GetComponents-tmp-$$";
             $cmd = "{ "
               . "rm -rf '$target/$tmpdir' && "
-              . "(cd '$target' && "
+              . "(cd -P '$target' && "
               . "$cvs -q -d $url checkout -d '$tmpdir' $branch $date '$checkout') && "
               . "mv '$target/$tmpdir' '$target/$name'; " . "}";
         }
         else {
-            $cmd = "cd '$target' && $cvs -q -d $url checkout $date $branch '$checkout'";
+            $cmd = "cd -P '$target' && $cvs -q -d $url checkout $date $branch '$checkout'";
         }
 
         print_checkout_info( $checkout, $url, $target, $name );
@@ -1197,7 +1198,7 @@ sub handle_cvs {
     elsif ( $method eq 'update' ) {
 
         my $dir = defined($name) ? $name : $checkout;
-        $cmd = "cd '$target/$dir' && $cvs -q update -dP $date $branch";
+        $cmd = "cd -P '$target/$dir' && $cvs -q update -dP $date $branch";
 
         print_update_info( $checkout, $url, $target, $name );
         my ( $ierr, $out ) = run_command($cmd);
@@ -1215,7 +1216,7 @@ sub handle_cvs {
     elsif ( $method eq 'status' ) {
 
         my $dir = defined($name) ? $name : $checkout;
-        $cmd = "cd '$target/$dir' && $cvs -n -q update -dP $branch";
+        $cmd = "cd -P '$target/$dir' && $cvs -n -q update -dP $branch";
 
         my ( $ierr, $out ) = run_command($cmd);
         $out = filter_status_output($out);
@@ -1305,7 +1306,7 @@ sub handle_svn {
 
         run_command("mkdir -p '$target'");
         my $dir = defined($name) ? $name : $checkout;
-        $cmd = "cd '$target' && $svn checkout --non-interactive $cert_hack $user$date $url '$dir'";
+        $cmd = "cd -P '$target' && $svn checkout --non-interactive $cert_hack $user$date $url '$dir'";
 
         print_checkout_info( $checkout, $url, $target, $name );
 
@@ -1315,7 +1316,7 @@ sub handle_svn {
         # Check for relocated repositories
         if ($out =~ /^svn: Repository moved permanently to '(.*)'; please relocate$/) {
             my $new_location = $1;
-            $cmd = "cd '$target' && $svn checkout --non-interactive $cert_hack $user$date '$new_location' '$dir'";
+            $cmd = "cd -P '$target' && $svn checkout --non-interactive $cert_hack $user$date '$new_location' '$dir'";
             ( $ierr, $out ) = run_command( $cmd, $bad_cert );
         }
         if ( $ierr || $out =~ /^svn/gmi ) {
@@ -1333,14 +1334,14 @@ sub handle_svn {
     elsif ( $method eq 'update' ) {
 
         my $dir = defined($name) ? $name : $checkout;
-        $cmd = "cd '$target/$dir' && $svn update --non-interactive $cert_hack $date";
+        $cmd = "cd -P '$target/$dir' && $svn update --non-interactive $cert_hack $date";
 
         print_update_info( $checkout, $url, $target, $name );
         ( $ierr, $out ) = run_command( $cmd, $bad_cert );
         # Check for relocated repositories
         if ($out =~ /^svn: Repository moved permanently to '(.*)'; please relocate$/) {
             my $new_location = $1;
-            $cmd = "cd '$target/$dir' && $svn info --non-interactive $cert_hack";
+            $cmd = "cd -P '$target/$dir' && $svn info --non-interactive $cert_hack";
             ( $ierr, $out ) = run_command( $cmd, $bad_cert );
             $out =~ /^URL: (.*)$/m;
             my $old_location = $1;
@@ -1350,7 +1351,7 @@ sub handle_svn {
                 lock( @components_error );
                 push( @components_error, $checkout );
             } else {
-                $cmd = "cd '$target/$dir' && $svn --non-interactive $cert_hack switch --relocate '$old_location' '$new_location'";
+                $cmd = "cd -P '$target/$dir' && $svn --non-interactive $cert_hack switch --relocate '$old_location' '$new_location'";
                 ( $ierr, $out ) = run_command( $cmd, $bad_cert );
                 if ( $ierr || $out =~ /^svn/gmi ) {
                     WARN("Could not relocate module $checkout");
@@ -1379,7 +1380,7 @@ sub handle_svn {
             $ierr = 1;
         }
         else {
-            $cmd = "cd '$target/$dir' && $svn status --non-interactive $cert_hack ";
+            $cmd = "cd -P '$target/$dir' && $svn status --non-interactive $cert_hack ";
             ( $ierr, $out ) = run_command( $cmd, $bad_cert );
             if ($out =~ /^[CE]\s+/gm) {
                 my $log = "Module $checkout has conflicts, don't forget to resolve\n";
@@ -1552,12 +1553,12 @@ sub handle_git {
                 $repo_path =~ s!\$1!$dir1!;
                 $repo_path =~ s!\$2!$dir2!;
 
-                $cmd = "cd '$target_dir' && "
+                $cmd = "cd -P '$target_dir' && "
                   . "$ln '$git_repos_dir/$git_repo/$repo_path' '$checkout_item'";
             }
             else {
                 $cmd =
-                    "cd '$target_dir' && "
+                    "cd -P '$target_dir' && "
                   . "$ln '$git_repos_dir/$git_repo/$repo_path/$checkout' "
                   . "'$checkout_item'";
             }
@@ -1573,7 +1574,7 @@ sub handle_git {
         elsif ( $checkout eq '.' ) {
 
             # checkout entire repo
-            $cmd = "cd '$target_dir' && $ln '$git_repos_dir/$git_repo' '$name'";
+            $cmd = "cd -P '$target_dir' && $ln '$git_repos_dir/$git_repo' '$name'";
             return if ( -e "$target_dir/$name" );
             my ( $ierr, $out ) = run_command($cmd);
             if ($ierr) {
@@ -1583,7 +1584,7 @@ sub handle_git {
             return $ierr;
         }
         else {
-            $cmd = "cd '$target_dir' && "
+            $cmd = "cd -P '$target_dir' && "
               . "$ln '$git_repos_dir/$git_repo/$checkout' '$checkout_item'";
             return if ( -e "$target_dir/$checkout_item" );
             my ( $ierr, $out ) = run_command($cmd);
@@ -1605,7 +1606,7 @@ sub handle_git {
                 && -e "$ROOT/git-repos/$git_repo" )
             {
                 run_command("mkdir -p '$ROOT/repos'");
-                run_command( "cd '$ROOT/repos' && "
+                run_command( "cd -P '$ROOT/repos' && "
                       . "$ln '../git-repos/$git_repo' '$git_repo'" );
             }
             print_update_info( $checkout, $url, $target, $name );
@@ -1628,7 +1629,7 @@ sub handle_git {
         # only need to run status once per repo
         return if ${ $updated_git_repos{$git_repo} };
         
-        my ( $ierr, $out ) = run_command("cd '$repo_loc' && $git status -s");
+        my ( $ierr, $out ) = run_command("cd -P '$repo_loc' && $git status -s");
         $out = filter_status_output($out);
         if ( $out !~ /^$/ ) {
             print "In $ROOT/repos/$git_repo:\n";
@@ -1642,7 +1643,7 @@ sub handle_git {
         # only need to run diff once per repo
         return if ${ $updated_git_repos{$git_repo} };
         
-        $cmd = "cd '$repo_loc' && $git diff --exit-code";
+        $cmd = "cd -P '$repo_loc' && $git diff --exit-code";
         my ( $ierr, $out ) = run_command($cmd);
         if ( $out !~ /^$/ ) {
             # help a bit with differentiating between diffs
@@ -1670,7 +1671,7 @@ sub handle_git {
         # only need to run once per repo
         return 1 if $verified_git_repos{$git_repo};
         
-        my $cmd = "cd '$repo_loc' && git config --get remote.origin.url";
+        my $cmd = "cd -P '$repo_loc' && git config --get remote.origin.url";
         my ( $ierr, $out ) = run_command($cmd);
         chomp($out);
         my $new_url = $out;
@@ -1704,7 +1705,7 @@ sub git_stash_update_repo {
     my ( $git_repo, $repo_loc, $checkout, @branches ) = @_;
     
     # stash local changes, if necessary
-    my ( $ierr, $out ) = run_command("cd '$repo_loc' && $git stash save GetComponents-tmp");
+    my ( $ierr, $out ) = run_command("cd -P '$repo_loc' && $git stash save GetComponents-tmp");
     if ($ierr) {
         my $logmsg = "Could not update $git_repo. Could not stash local changes. Error message was '$out'.";
         WARN($logmsg);
@@ -1717,7 +1718,7 @@ sub git_stash_update_repo {
     my $ret = git_update_repo($git_repo, $repo_loc, $checkout, @branches);
 
     # pop stash if necessary
-    ( $ierr, $out ) = run_command("cd '$repo_loc' && if $git stash list | grep -q GetComponents-tmp; then $git stash pop \$($git stash list | grep GetComponents-tmp | sed -e 's/:.*//'); fi");
+    ( $ierr, $out ) = run_command("cd -P '$repo_loc' && if $git stash list | grep -q GetComponents-tmp; then $git stash pop \$($git stash list | grep GetComponents-tmp | sed -e 's/:.*//'); fi");
     if ($ierr) {
         my $logmsg = "Could not update $git_repo. Could not pop stashed changes. Error message was '$out'.";
         WARN($logmsg);
@@ -1733,7 +1734,7 @@ sub git_update_repo {
     my ( $git_repo, $repo_loc, $checkout, @branches ) = @_;
 
     # update remote origin to make sure we can see all remote branches
-    my ( $ierr, $out ) = run_command("cd '$repo_loc' && $git remote update origin");
+    my ( $ierr, $out ) = run_command("cd -P '$repo_loc' && $git remote update origin");
     if ($ierr) {
         my $logmsg = "Could not update $git_repo. "
           . "Could not update remote 'origin'.";
@@ -1745,14 +1746,14 @@ sub git_update_repo {
     }
     
     # what branch/tag are we on?
-    ( $ierr, $out ) = run_command("cd '$repo_loc' && $git branch");
+    ( $ierr, $out ) = run_command("cd -P '$repo_loc' && $git branch");
     $out =~ /^\*\s*(.*)/m;
     my $current_branch = $1;
     # TODO: this is broken since git does not report "no branch" when on a tag for example
     if ($current_branch =~ /no branch/) {
         # figure out which tag we're on....
-        my $commit = `cd '$repo_loc' && $git rev-parse HEAD`;
-        $current_branch = `cd '$repo_loc' && $git tag --contains $commit`;
+        my $commit = `cd -P '$repo_loc' && $git rev-parse HEAD`;
+        $current_branch = `cd -P '$repo_loc' && $git tag --contains $commit`;
     }
     
     # now loop through specified branches, and append 'master'
@@ -1764,11 +1765,11 @@ sub git_update_repo {
         # 3. branch is actually tag, do nothing
 
         # TODO: fix this it fails since it uses the branch name as a regex
-        if ( `cd '$repo_loc' && $git branch` =~ /$branch/m ) {
+        if ( `cd -P '$repo_loc' && $git branch` =~ /$branch/m ) {
             # case 1
             # checkout branch and pull --rebase
             ( $ierr, $out ) = run_command(
-                            "cd '$repo_loc' && " .
+                            "cd -P '$repo_loc' && " .
                             "if [ xrefs/heads/$branch != x`$git symbolic-ref -q HEAD` ] ; then " .
                             "  $git checkout $branch ; " .
                             "fi && " .
@@ -1782,10 +1783,10 @@ sub git_update_repo {
                 push( @components_error, $checkout );
                 return $ierr;
             }
-        } elsif ( `cd '$repo_loc' && $git branch -r` =~ /$branch/m ) {
+        } elsif ( `cd -P '$repo_loc' && $git branch -r` =~ /$branch/m ) {
             # dealing with a remote tracking branch
             ( $ierr, $out ) = run_command(
-                        "cd '$repo_loc' && " .
+                        "cd -P '$repo_loc' && " .
                         "$git checkout --track -b $branch origin/$branch");
             if ($ierr) {
                 my $logmsg = "Could not update $git_repo. "
@@ -1801,7 +1802,7 @@ sub git_update_repo {
     
     # now checkout original branch if required
     ( $ierr, $out ) = run_command(
-                "cd '$repo_loc' && " .
+                "cd -P '$repo_loc' && " .
                 "if [ xrefs/heads/$current_branch != x`$git symbolic-ref -q HEAD` ] ; then " .
                 "  $git checkout $current_branch ; " .
                 "fi");
@@ -1848,12 +1849,12 @@ sub handle_curl {
             $cmd = "{ "
               . "rm -rf '$tmpdir' && "
               . "mkdir '$tmpdir' && "
-              . "(cd '$tmpdir' && $curl --location -O $user $url/$checkout) && "
+              . "(cd -P '$tmpdir' && $curl --location -O $user $url/$checkout) && "
               . "mv '$tmpdir/$checkout' '$target/$name' &&"
               . "rmdir '$tmpdir'; " . "}";
         }
         else {
-            $cmd = "cd '$target' && $curl --location -O $user $url/$checkout";
+            $cmd = "cd -P '$target' && $curl --location -O $user $url/$checkout";
         }
         print_checkout_info( $checkout, $url, $target, $name );
         my ( $ierr, $out ) = run_command($cmd);
@@ -1877,12 +1878,12 @@ sub handle_curl {
               . "rm -rf '$tmpdir' && "
               . "mkdir '$tmpdir' && "
               . "mv '$name' '$tmpdir/$checkout' && "
-              . "(cd '$tmpdir' && $curl --location -O $user $url/$checkout) && "
+              . "(cd -P '$tmpdir' && $curl --location -O $user $url/$checkout) && "
               . "mv '$tmpdir/$checkout' '$target/$name' &&"
               . "rmdir $tmpdir; " . "}";
         }
         else {
-            $cmd = "cd '$target' && $curl --location -O $user $url/$checkout";
+            $cmd = "cd -P '$target' && $curl --location -O $user $url/$checkout";
         }
 
         # add modification timestamp to old version
@@ -2020,12 +2021,12 @@ sub handle_darcs {
                 $repo_path =~ s!\$1!$dir1!;
                 $repo_path =~ s!\$2!$dir2!;
 
-                $cmd = "cd '$target_dir' && "
+                $cmd = "cd -P '$target_dir' && "
                   . "$ln '$darcs_repos_dir/$darcs_repo/$repo_path' '$checkout_item'";
             }
             else {
                 $cmd =
-                    "cd '$target_dir' && "
+                    "cd -P '$target_dir' && "
                   . "$ln '$darcs_repos_dir/$darcs_repo/$repo_path/$checkout' "
                   . "'$checkout_item'";
             }
@@ -2041,7 +2042,7 @@ sub handle_darcs {
 
             # checkout entire repo
             $cmd =
-              "cd '$target_dir' && " . "$ln '$darcs_repos_dir/$darcs_repo' '$name'";
+              "cd -P '$target_dir' && " . "$ln '$darcs_repos_dir/$darcs_repo' '$name'";
             return if ( -e "$target_dir/$name" );
             my ( $ierr, $out ) = run_command($cmd);
             if ($ierr) {
@@ -2051,7 +2052,7 @@ sub handle_darcs {
             return $ierr;
         }
         else {
-            $cmd = "cd '$target_dir' && "
+            $cmd = "cd -P '$target_dir' && "
               . "$ln '$darcs_repos_dir/$darcs_repo/$checkout' '$checkout_item'";
             return if ( -e "$target_dir/$checkout_item" );
             my ( $ierr, $out ) = run_command($cmd);
@@ -2070,7 +2071,7 @@ sub handle_darcs {
                 && -e "$ROOT/darcs-repos/$darcs_repo" )
             {
                 run_command("mkdir -p '$ROOT/repos'");
-                run_command( "cd '$ROOT/repos' && "
+                run_command( "cd -P '$ROOT/repos' && "
                       . "$ln '../darcs-repos/$darcs_repo' '$darcs_repo'" );
             }
 
@@ -2098,7 +2099,7 @@ sub handle_darcs {
     elsif ( $method eq 'status' ) {
 
         return if ${ $updated_darcs_repos{$darcs_repo} };
-        my $cmd = "cd '$repo_loc' && $darcs whatsnew";
+        my $cmd = "cd -P '$repo_loc' && $darcs whatsnew";
         my ( $ierr, $out ) = run_command($cmd);
         $out = filter_status_output($out);
         if ( $out !~ /^$/ ) {
@@ -2111,7 +2112,7 @@ sub handle_darcs {
     elsif ( $method eq 'diff' ) {
 
         return if ${ $updated_darcs_repos{$darcs_repo} };
-        $cmd = "cd '$repo_loc' && $darcs diff -u";
+        $cmd = "cd -P '$repo_loc' && $darcs diff -u";
         my ( $ierr, $out ) = run_command($cmd);
         $out =~ s!^--- a/!--- a/$ROOT/repos/$darcs_repo/!gm;
         $out =~ s!^\+\+\+ b/!\+\+\+ b/$ROOT/repos/$darcs_repo/!gm;
@@ -2124,7 +2125,7 @@ sub handle_darcs {
         # only need to run once per repo
         return 1 if $verified_darcs_repos{$darcs_repo};
 
-        my $cmd = "cd '$repo_loc' && $darcs show repo --no-files";
+        my $cmd = "cd -P '$repo_loc' && $darcs show repo --no-files";
         my ( $ierr, $out ) = run_command($cmd);
         $verified_darcs_repos{$darcs_repo} = 1;
         return ( $out =~ /Default Remote: $url/ );
@@ -2170,12 +2171,12 @@ sub handle_wget {
             $cmd = "{ "
               . "rm -rf '$tmpdir' && "
               . "mkdir '$tmpdir' && "
-              . "(cd '$tmpdir' && $wget $user $pass $url/$checkout) && "
+              . "(cd -P '$tmpdir' && $wget $user $pass $url/$checkout) && "
               . "mv '$tmpdir/$checkout' '$target/$name' &&"
               . "rmdir '$tmpdir'; " . "}";
         }
         else {
-            $cmd = "cd '$target' && $wget $user $pass $url/$checkout";
+            $cmd = "cd -P '$target' && $wget $user $pass $url/$checkout";
         }
         print_checkout_info( $checkout, $url, $target, $name );
         my ( $ierr, $out ) = run_command($cmd);
@@ -2198,12 +2199,12 @@ sub handle_wget {
               . "rm -rf '$tmpdir' && "
               . "mkdir '$tmpdir' && "
               . "mv $name '$tmpdir/$checkout' && "
-              . "(cd '$tmpdir' && $wget $user $pass $url/$checkout) && "
+              . "(cd -P '$tmpdir' && $wget $user $pass $url/$checkout) && "
               . "mv '$tmpdir/$checkout' '$target/$name' &&"
               . "rmdir '$tmpdir'; " . "}";
         }
         else {
-            $cmd = "cd '$target' && $wget $user $pass $url/$checkout";
+            $cmd = "cd -P '$target' && $wget $user $pass $url/$checkout";
         }
 
         # add modification timestamp to old version
@@ -2389,12 +2390,12 @@ sub handle_hg {
                 $repo_path =~ s!\$1!$dir1!;
                 $repo_path =~ s!\$2!$dir2!;
 
-                $cmd = "cd '$target_dir' && "
+                $cmd = "cd -P '$target_dir' && "
                   . "$ln $hg_repos_dir/$hg_repo/$repo_path $checkout_item";
             }
             else {
                 $cmd =
-                    "cd '$target_dir' && "
+                    "cd -P '$target_dir' && "
                   . "$ln '$hg_repos_dir/$hg_repo/$repo_path/$checkout' "
                   . "'$checkout_item'";
             }
@@ -2409,7 +2410,7 @@ sub handle_hg {
         elsif ( $checkout eq '.' ) {
 
             # checkout entire repo
-            $cmd = "cd '$target_dir' && " . "$ln '$hg_repos_dir/$hg_repo' '$name'";
+            $cmd = "cd -P '$target_dir' && " . "$ln '$hg_repos_dir/$hg_repo' '$name'";
             my ($ierr, $out) = (0, "");
             if ( not -e "$target_dir/$name" ) {
                 ( $ierr, $out ) = run_command($cmd);
@@ -2421,7 +2422,7 @@ sub handle_hg {
             return $ierr;
         }
         else {
-            $cmd = "cd '$target_dir' && "
+            $cmd = "cd -P '$target_dir' && "
               . "$ln '$hg_repos_dir/$hg_repo/$checkout' '$checkout_item'";
             my ($ierr, $out) = (0, "");
             if ( not -e "$target_dir/$checkout_item" ) {
@@ -2441,7 +2442,7 @@ sub handle_hg {
                 && -e "$ROOT/hg-repos/$hg_repo" )
             {
                 run_command("mkdir -p '$ROOT/repos'");
-                run_command( "cd '$ROOT/repos' && "
+                run_command( "cd -P '$ROOT/repos' && "
                       . "$ln '../hg-repos/$hg_repo' '$hg_repo'" );
             }
 
@@ -2469,7 +2470,7 @@ sub handle_hg {
     elsif ( $method eq 'status' ) {
         
         return if ${ $updated_hg_repos{$hg_repo} };
-        my $cmd = "cd '$repo_loc' && $hg status";
+        my $cmd = "cd -P '$repo_loc' && $hg status";
         my ( $ierr, $out ) = run_command($cmd);
         $out = filter_status_output($out);
         if ( $out !~ /^$/ ) {
@@ -2484,7 +2485,7 @@ sub handle_hg {
         # only need to run diff once per repo
         return if ${ $updated_hg_repos{$hg_repo} };
 
-        $cmd = "cd '$repo_loc' && $hg diff";
+        $cmd = "cd -P '$repo_loc' && $hg diff";
         my ( $ierr, $out ) = run_command($cmd);
         if ( $out !~ /^$/ ) {
             # help a bit with differentiating between diffs
@@ -2511,7 +2512,7 @@ sub handle_hg {
         # only need to run once per repo
         return 1 if $verified_hg_repos{$hg_repo};
 
-        my $cmd = "cd '$repo_loc' && $hg showconfig paths.default";
+        my $cmd = "cd -P '$repo_loc' && $hg showconfig paths.default";
         my ( $ierr, $out ) = run_command($cmd);
         $verified_hg_repos{$hg_repo} = 1;
         # match against either anonymous or authenticated URL, assuming
@@ -2533,10 +2534,10 @@ sub run_command {
     if ( $command =~ /^$/ ) { return }
     if ($VERBOSE) {
 
-        if ( $command =~ /^cd (.*) \&\& (.*)$/ ) {
+        if ( $command =~ /^cd -P (.*) \&\& (.*)$/ ) {
             my ( $cmd, $loc ) = ( $2, $1 );
             print BOLD, "Executing: ", RESET, "$cmd\n",
-                  BOLD, "       In: ", RESET, "$loc\n";
+                  BOLD, "       In: ", RESET, realpath($loc), "\n";
         }
         else { print BOLD, "Executing: ", RESET, "$command\n" }
     }
