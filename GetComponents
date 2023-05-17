@@ -156,6 +156,10 @@ GetOptions(
 pod2usage(1) if $HELP;
 pod2usage( -verbose => 2 ) if $MAN;
 
+if ( $PARALLEL && !defined($QUEUE) ) {
+    &DIE("Parallel checkout is not possible unless the Perl packages threads, threads::shared, Thread::Queue, and Scalar::Util are installed. Please either (a) install these packages, or (b) leave out the --parallel option.");
+}
+
 find_tools();
 
 &process_args();
