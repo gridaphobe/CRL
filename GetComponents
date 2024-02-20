@@ -2538,7 +2538,7 @@ sub run_command {
     if ( $command =~ /^$/ ) { return }
     if ($VERBOSE) {
 
-        if ( $command =~ /^cd -P (.*) \&\& (.*)$/ ) {
+        if ( $command =~ /^cd -P ['"]?(.*?)['"]? \&\& (.*)$/ ) {
             my ( $cmd, $loc ) = ( $2, $1 );
             print BOLD, "Executing: ", RESET, "$cmd\n",
                   BOLD, "       In: ", RESET, realpath($loc), "\n";
