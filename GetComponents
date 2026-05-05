@@ -1478,7 +1478,7 @@ sub handle_git {
         $pushurl = $component{"AUTH_URL_ORIG"};
     }
     my $shallow;
-    if    ( $SHALLOW_CLONE == 1 ) { $shallow = ' --depth 1' }
+    if    ( $SHALLOW_CLONE == 1 ) { $shallow = ' --depth 1 --shallow-submodules' }
     elsif ( $SHALLOW_CLONE == 0 ) { $shallow = '' }
     my $checkout      = $component{"CHECKOUT"};
     my $repo_path     = $component{"REPO_PATH"};
@@ -1514,7 +1514,7 @@ sub handle_git {
             if ( $SHALLOW_CLONE > 0 ) {
                 $branch_opts .= " --single-branch";
             }
-            $cmd = "$git clone$shallow$branch_opts $url '$repo_loc'";
+            $cmd = "$git clone --recurse-submodules$shallow$branch_opts $url '$repo_loc'";
             my ( $ierr, $out ) = run_command($cmd);
             if ($ierr) {
                 my $log = "Could not checkout module $checkout\n";
@@ -1790,7 +1790,7 @@ sub git_update_repo {
             ( $ierr, $out ) = run_command(
                             "cd -P '$repo_loc' && " .
                             "if [ xrefs/heads/$branch != x`$git symbolic-ref -q HEAD` ] ; then " .
-                            "  $git checkout $branch ; " .
+                            "  $git checkout --recurse-submodules $branch ; " .
                             "fi && " .
                             "$git pull --rebase origin $branch");
             if ($ierr) {
@@ -1806,7 +1806,7 @@ sub git_update_repo {
             # dealing with a remote tracking branch
             ( $ierr, $out ) = run_command(
                         "cd -P '$repo_loc' && " .
-                        "$git checkout --track -b $branch origin/$branch");
+                        "$git checkout --recurse-submodules --track -b $branch origin/$branch");
             if ($ierr) {
                 my $logmsg = "Could not update $git_repo. "
                   . "Could not create local branch for $branch.";
@@ -1823,7 +1823,7 @@ sub git_update_repo {
     ( $ierr, $out ) = run_command(
                 "cd -P '$repo_loc' && " .
                 "if [ xrefs/heads/$current_branch != x`$git symbolic-ref -q HEAD` ] ; then " .
-                "  $git checkout $current_branch ; " .
+                "  $git checkout --recurse-submodules $current_branch ; " .
                 "fi");
     if ($ierr) {
         my $logmsg = "Could not update $git_repo. "
