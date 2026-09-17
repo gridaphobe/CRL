@@ -70,6 +70,10 @@ my @all_components;
 # to avoid deadlock no other lock may be acquired while holding any of these
 my $checkout_size : shared = 0;
 my $update_size : shared   = 0;
+my $switch_success : shared = 0;
+my $switch_forced : shared  = 0;
+my $switch_aborted : shared = 0;
+my $switch_ignored : shared = 0;
 my @components_error : shared;
 my @warnings : shared;
 my %svn_servers : shared;
@@ -84,6 +88,8 @@ my $DO_UPDATES         = undef;
 my $STATUS             = 0;
 my $DIFF               = 0;
 my $SHALLOW_CLONE      = 1;
+my $SWITCH_BRANCH      = 0;
+my $FORCE_SWITCH       = 0;
 my $DATE;
 my @CRL_LISTS;
 my @ORIG_LISTS;
@@ -151,10 +157,15 @@ GetOptions(
     'diff'                 => \$DIFF,
     'parallel!'            => \$PARALLEL,
     'shallow!'             => \$SHALLOW_CLONE,
+    'switch-branch!'       => \$SWITCH_BRANCH,
+    'force-switch-branch!' => \$FORCE_SWITCH,
     'reset-authentication' => sub { system("rm $crl_dir/users") }
 ) or pod2usage(2);
 pod2usage(1) if $HELP;
 pod2usage( -verbose => 2 ) if $MAN;
+
+# forceful switching implies switching is enabled at all
+$SWITCH_BRANCH = 1 if $FORCE_SWITCH;
 
 if ( $PARALLEL && !defined($QUEUE) ) {
     &DIE("Parallel checkout is not possible unless the Perl packages threads, threads::shared, Thread::Queue, and Scalar::Util are installed. Please either (a) install these packages, or (b) leave out the --parallel option.");
@@ -287,6 +298,107 @@ sub find_tools {
         # Use compression to speed up slow links, and to avoid
         # transmission errors with CCT's CVS server
         $cvs = "$cvs -z9";
+    }
+}
+
+# !REPO_BRANCH values declared by the previously used thornlist, keyed by
+# "$target/$checkout" (relative to $ROOT), used by gentle branch switching
+# to tell a manual branch change apart from a GetComponents-managed one.
+# The "previous thornlist" is found under Cactus/thornlists/ (the cache
+# populated by write_componentlist_target() on every run): either the file
+# with the same name as one given on the command line (the thornlist was
+# edited and rerun in place), or, failing that, the most recently cached
+# thornlist under a different name (the release name itself changed, e.g.
+# einsteintoolkit_2025_05.th -> einsteintoolkit_2026_05.th).
+my %PREVIOUS_REPO_BRANCH;
+my $PREVIOUS_BRANCHES_LOADED = 0;
+
+sub previous_branch_key {
+    my ( $target, $checkout ) = @_;
+    my $key = File::Spec->canonpath("$target/$checkout");
+    $key =~ s!^\Q$ROOT\E/!!;
+    return $key;
+}
+
+sub find_previous_thornlist {
+    my $dir = $DEFINITIONS{COMPONENTLIST_TARGET};
+    return undef unless defined($dir) && -d $dir;
+
+    my @current_names = map { my $n = $_; $n =~ s!.*/!!; $n } @CRL_LISTS;
+
+    # the most recently cached thornlist under a different name than the one
+    # being used this run (e.g. einsteintoolkit_2025_05.th -> _2026_05.th).
+    # A same-named cached copy is deliberately not used as a fallback: if the
+    # same file is simply rerun unchanged, it would just mirror itself and
+    # give no useful "before" state to compare against.
+    my %is_current = map { ( $_ => 1 ) } @current_names;
+    opendir( my $DH, $dir ) or return undef;
+    my @candidates;
+    while ( my $entry = readdir($DH) ) {
+        next if $entry =~ /^\./;
+        next if $is_current{$entry};
+        my $path = "$dir/$entry";
+        push @candidates, $path if -f $path;
+    }
+    closedir($DH);
+    return undef unless @candidates;
+
+    # stat() explicitly rather than inline in the sort block: with parallel
+    # processing, several worker threads may look this up concurrently, and
+    # a transient stat() failure (e.g. racing a concurrent write) would
+    # otherwise silently compare as an uninitialized value
+    my @with_mtime = map {
+        my @s = stat($_);
+        [ $_, defined( $s[9] ) ? $s[9] : 0 ]
+    } @candidates;
+    @with_mtime = sort { $b->[1] <=> $a->[1] } @with_mtime;
+    return $with_mtime[0][0];
+}
+
+# Populate %PREVIOUS_REPO_BRANCH from the previously used thornlist, if any.
+# This is a best-effort, non-interactive re-parse of that file, only
+# concerned with !TARGET/!CHECKOUT/!REPO_BRANCH.
+sub load_previous_branches {
+    return if $PREVIOUS_BRANCHES_LOADED;
+    $PREVIOUS_BRANCHES_LOADED = 1;
+
+    my $old_list = find_previous_thornlist();
+    return unless defined($old_list) && -e $old_list;
+
+    open( my $OLD, $old_list ) or return;
+    my $text = do { local $/; <$OLD> };
+    close($OLD);
+
+    # seed with the current definitions (e.g. $ROOT), then let any !DEFINE
+    # found in the old file (e.g. an older $ET_RELEASE) override them
+    my %old_defs = %DEFINITIONS;
+    while ( $text =~ /^!DEFINE\s*([^\s]+)\s*=\s*(.+)$/mg ) {
+        my ( $def, $value ) = ( $1, $2 );
+        $value =~ s/\$(\w+)/defined($old_defs{$1}) ? $old_defs{$1} : ''/ge;
+        $old_defs{$def} = $value;
+    }
+
+    my @sections = split( /^!TARGET\s*=\s*/m, $text );
+    shift(@sections);
+    foreach my $section (@sections) {
+        $section = "!TARGET = $section";
+        my @pairs = split( /^\s*!([^\s=]+)\s*=\s*/m, $section );
+        shift(@pairs);
+        for my $p (@pairs) { $p =~ s/\s+$//; }
+        my %rec;
+        { no warnings 'all'; %rec = @pairs; }
+        next unless defined( $rec{TARGET} ) && defined( $rec{CHECKOUT} );
+
+        my $target = $rec{TARGET};
+        $target =~ s/\$(\w+)/defined($old_defs{$1}) ? $old_defs{$1} : ''/ge;
+
+        my $branch = $rec{REPO_BRANCH};
+        $branch = '' unless defined($branch);
+        $branch =~ s/\$(\w+)/defined($old_defs{$1}) ? $old_defs{$1} : ''/ge;
+
+        foreach my $checkout ( split( /\s+/, $rec{CHECKOUT} ) ) {
+            $PREVIOUS_REPO_BRANCH{ previous_branch_key( $target, $checkout ) } = $branch;
+        }
     }
 }
 
@@ -1491,6 +1603,12 @@ sub handle_git {
     my $tag;
     my $repo_loc = "$ROOT/repos/$git_repo";
 
+    # branch requested by the current thornlist, and the one requested by
+    # the previously used thornlist, used to decide on branch switching
+    my $desired_branch = @branches ? $branches[0] : undef;
+    load_previous_branches();
+    my $old_desired_branch = $PREVIOUS_REPO_BRANCH{ previous_branch_key( $target, $checkout ) };
+
     lock( ${ $updated_git_repos{$git_repo} } );
     
     if ( $method eq 'checkout' ) {
@@ -1543,7 +1661,8 @@ sub handle_git {
 
         # if git repo has already been cloned, we will pull the latest version
         elsif ( ${ $updated_git_repos{$git_repo} } == 0 ) {
-            git_stash_update_repo( $git_repo, $repo_loc, $checkout, @branches );
+            git_stash_update_repo( $git_repo, $repo_loc, $checkout,
+                                    $desired_branch, $old_desired_branch, @branches );
         }
 
         my ( $checkout_dir, $checkout_item ) = split( /\//, $checkout );
@@ -1631,7 +1750,7 @@ sub handle_git {
             print_update_info( $checkout, $url, $target, $name );
             
             my $ierr = git_stash_update_repo( $git_repo, $repo_loc, $checkout,
-                                             @branches);
+                                             $desired_branch, $old_desired_branch, @branches);
             return $ierr;
         }
 
@@ -1721,9 +1840,63 @@ sub handle_git {
 }
 
 sub git_stash_update_repo {
-    my ( $git_repo, $repo_loc, $checkout, @branches ) = @_;
-    
-    # stash local changes, if necessary
+    my ( $git_repo, $repo_loc, $checkout, $desired_branch, $old_desired_branch, @branches ) = @_;
+
+    my $current_branch = git_current_branch($repo_loc);
+
+    # opportunistically track the currently checked out branch too, if it
+    # turns out to be a real remote branch (e.g. a manually checked out
+    # feature branch): repositories are cloned --single-branch, so unless
+    # this is done, plain git commands would never learn about it either
+    if ( $current_branch ne '' ) {
+        my ( $rerr, $rout ) = run_command("cd -P '$repo_loc' && $git ls-remote --exit-code --heads origin '$current_branch'");
+        git_track_remote_ref( $repo_loc, "+refs/heads/$current_branch:refs/remotes/origin/$current_branch" ) unless $rerr;
+    }
+
+    my $switch_target = git_target_branch( $current_branch, $desired_branch, $old_desired_branch );
+
+    # no switch is happening for this repo: either it's already on the
+    # requested branch, no branch was requested at all, or (gentle mode
+    # only) it's on some other, manually checked out branch. Together with
+    # $switch_aborted, this accounts for every repo whose branch did not
+    # change this run.
+    if ( !defined($switch_target) && $SWITCH_BRANCH ) {
+        lock($switch_ignored);
+        $switch_ignored++;
+    }
+
+    # If we are switching to the thornlist branch, do it directly and do not
+    # go through the stash/pop flow. That is the conservative behavior: a plain
+    # git checkout conflict is treated as a conflict, not as a forced stash pop.
+    if ( defined($switch_target) ) {
+        # a switch is only "forced" if gentle rules alone would not have allowed it
+        my $is_gentle_eligible = defined($old_desired_branch) && $old_desired_branch ne ''
+          && $current_branch eq $old_desired_branch;
+        my $is_forced = $FORCE_SWITCH && !$is_gentle_eligible;
+
+        my ( $ierr, $out ) = git_checkout_switch_target( $repo_loc, $switch_target );
+        if ($ierr) {
+            my $logmsg = "Could not update $git_repo. Could not switch from '$current_branch' to '$switch_target'. Error message was '$out'.";
+            WARN($logmsg);
+            ${ $updated_git_repos{$git_repo} } = -1;
+            lock( @components_error );
+            push( @components_error, $checkout );
+            lock($switch_aborted);
+            $switch_aborted++;
+            return $ierr;
+        }
+
+        ${ $updated_git_repos{$git_repo} } = 1;
+        if ($is_forced) { lock($switch_forced); $switch_forced++; }
+        else { lock($switch_success); $switch_success++; }
+        print "-----------------------------------------------------------------\n"
+          . "  Switched $git_repo from '$current_branch' to '$switch_target'\n" unless $DEBUG;
+        return 0;
+    }
+
+    # Otherwise, stay conservative on the current branch and use the usual
+    # stash/update/pop path, which preserves local work if the user is on a
+    # manual branch or a non-managed branch.
     my ( $ierr, $out ) = run_command("cd -P '$repo_loc' && $git stash save GetComponents-tmp");
     if ($ierr) {
         my $logmsg = "Could not update $git_repo. Could not stash local changes. Error message was '$out'.";
@@ -1734,9 +1907,8 @@ sub git_stash_update_repo {
         return $ierr;
     }
 
-    my $ret = git_update_repo($git_repo, $repo_loc, $checkout, @branches);
+    my $ret = git_update_repo($git_repo, $repo_loc, $checkout, $desired_branch, $old_desired_branch, @branches);
 
-    # pop stash if necessary
     ( $ierr, $out ) = run_command("cd -P '$repo_loc' && if $git stash list | grep -q GetComponents-tmp; then $git stash pop \$($git stash list | grep GetComponents-tmp | sed -e 's/:.*//'); fi");
     if ($ierr) {
         my $logmsg = "Could not update $git_repo. Could not pop stashed changes. Error message was '$out'.";
@@ -1749,8 +1921,114 @@ sub git_stash_update_repo {
     return $ret;
 }
 
+sub git_target_branch {
+    my ( $current_branch, $desired_branch, $old_desired_branch ) = @_;
+    return undef unless $SWITCH_BRANCH;
+    return undef unless defined($desired_branch) && $desired_branch ne '';
+    return undef if !defined($current_branch) || $current_branch eq '';
+
+    # Already on the requested branch: no switch needed.
+    return undef if $current_branch eq $desired_branch;
+
+    # Forceful mode: switch whenever the branch is different and exists.
+    return $desired_branch if $FORCE_SWITCH;
+
+    # Gentle mode: only switch if the repository is currently on the previous
+    # managed branch; otherwise leave a manually checked out branch alone.
+    if ( defined($old_desired_branch) && $old_desired_branch ne '' && $current_branch eq $old_desired_branch ) {
+        return $desired_branch;
+    }
+
+    # Branch differs from both old and new thornlist values: this looks like a
+    # manual checkout; do not switch away from it in gentle mode.
+    return undef;
+}
+
+sub git_current_branch {
+    my ( $repo_loc ) = @_;
+    my ( $ierr, $out ) = run_command("cd -P '$repo_loc' && $git symbolic-ref -q --short HEAD");
+    if ( !$ierr ) {
+        chomp($out);
+        return $out;
+    }
+
+    # detached HEAD: if we are sitting exactly on a tag (as happens after a
+    # clone or switch onto an ET release, which is a tag rather than a
+    # branch), report that tag name so it can still be compared against
+    # !REPO_BRANCH for switch-eligibility purposes
+    ( $ierr, $out ) = run_command("cd -P '$repo_loc' && $git describe --tags --exact-match");
+    if ( !$ierr ) {
+        chomp($out);
+        return $out;
+    }
+
+    return '';
+}
+
+# Add $refspec to origin's fetch refspec list, if not already present, so a
+# plain 'git fetch'/'git remote update origin' picks up further changes to
+# it on its own from now on (repositories are cloned --single-branch, which
+# only configures a refspec for the branch used at clone time). Tags can
+# also be force-moved on the remote, so this is used for tags too, not only
+# branches.
+sub git_track_remote_ref {
+    my ( $repo_loc, $refspec ) = @_;
+    my ( $ierr, $out ) = run_command("cd -P '$repo_loc' && $git config --get-all remote.origin.fetch");
+    return if !$ierr && index( $out, $refspec ) >= 0;
+    run_command("cd -P '$repo_loc' && $git config --add remote.origin.fetch '$refspec'");
+}
+
+# Check out $target in $repo_loc for a branch switch, whether $target is a
+# real (moving) branch or a fixed tag, such as an ET release (e.g.
+# ET_2026_05). ET releases are usually published as tags, not branches: a
+# plain 'git checkout <tag>' would leave the repository in detached HEAD
+# instead of on a branch, so for a tag we create (or reuse) a local branch
+# of the same name pinned to that tag. Tags never move, so no pull follows.
+#
+# Repositories are normally cloned with --single-branch, which narrows the
+# origin remote's fetch refspec to just the branch used at clone time; a
+# plain 'git remote update origin' will then never learn about any other
+# branch or tag, and a manually fetched ref outside that refspec is not
+# recognized by git as a trackable remote branch either. So instead of
+# relying on local remote-tracking refs, ask the remote directly via
+# 'git ls-remote', fetch exactly the ref we need into FETCH_HEAD, and pin a
+# same-named local branch to it directly (this also serves as the "pull":
+# for a real branch this brings it up to date, for a tag it is a no-op
+# since tags never move).
+sub git_checkout_switch_target {
+    my ( $repo_loc, $target ) = @_;
+
+    my ( $ierr, $out ) = run_command("cd -P '$repo_loc' && $git ls-remote --exit-code --heads origin '$target'");
+    my $is_remote_branch = !$ierr;
+
+    my $is_remote_tag = 0;
+    unless ($is_remote_branch) {
+        ( $ierr, $out ) = run_command("cd -P '$repo_loc' && $git ls-remote --exit-code --tags origin '$target'");
+        $is_remote_tag = !$ierr;
+    }
+
+    if ($is_remote_branch) {
+        git_track_remote_ref( $repo_loc, "+refs/heads/$target:refs/remotes/origin/$target" );
+    }
+    elsif ($is_remote_tag) {
+        git_track_remote_ref( $repo_loc, "+refs/tags/$target:refs/tags/$target" );
+    }
+
+    if ( $is_remote_branch || $is_remote_tag ) {
+        ( $ierr, $out ) = run_command("cd -P '$repo_loc' && $git fetch origin '$target'");
+        return ( $ierr, "Could not fetch '$target' from origin. $out" ) if $ierr;
+
+        return run_command("cd -P '$repo_loc' && $git checkout -B '$target' FETCH_HEAD");
+    }
+
+    ( $ierr, $out ) = run_command("cd -P '$repo_loc' && $git show-ref --verify --quiet refs/heads/$target");
+    return run_command("cd -P '$repo_loc' && $git checkout '$target'") unless $ierr;
+
+    return ( 1, "'$target' is neither a branch nor a tag on origin (or locally)" );
+}
+
 sub git_update_repo {
-    my ( $git_repo, $repo_loc, $checkout, @branches ) = @_;
+    my ( $git_repo, $repo_loc, $checkout, $desired_branch, $old_desired_branch, @branches ) = @_;
 
     # update remote origin to make sure we can see all remote branches
     my ( $ierr, $out ) = run_command("cd -P '$repo_loc' && $git remote update origin");
@@ -1763,30 +2041,37 @@ sub git_update_repo {
         push( @components_error, $checkout );
         return $ierr;
     }
-    
-    # what branch/tag are we on?
-    ( $ierr, $out ) = run_command("cd -P '$repo_loc' && $git branch");
-    $out =~ /^\*\s*(.*)/m;
-    my $current_branch = $1;
-    # TODO: this is broken since git does not report "no branch" when on a tag for example
-    if ($current_branch =~ /no branch/) {
-        # figure out which tag we're on....
-        my $commit = `cd -P '$repo_loc' && $git rev-parse HEAD`;
-        $current_branch = `cd -P '$repo_loc' && $git tag --contains $commit`;
-    }
-    
-    # now loop through specified branches, and append 'master'
-    push @branches, 'master';
-    for my $branch (@branches) {
-        # three possibilities: 
-        # 1. branch exists locally, needs update
-        # 2. branch exists remotely, needs local tracking branch
-        # 3. branch is actually tag, do nothing
 
-        # TODO: fix this it fails since it uses the branch name as a regex
-        if ( `cd -P '$repo_loc' && $git branch` =~ /$branch/m ) {
-            # case 1
-            # checkout branch and pull --rebase
+    my $current_branch = git_current_branch($repo_loc);
+
+    # Branch switching, if any, is already handled by git_stash_update_repo
+    # before this function is called; from here we only ever operate on the
+    # original, non-switching --update behavior.
+
+    # No switch requested or applicable: fall back to the original,
+    # non-switching --update behavior verbatim. Any branch named by the
+    # thornlist is pulled if it already exists locally, or created locally
+    # (pinned to the matching remote branch or tag) if it doesn't. The
+    # repository is then always restored to whatever branch was active on
+    # entry, so plain --update never leaves the working tree on a different
+    # branch. Only branches actually named by the thornlist are touched;
+    # an arbitrary current branch (or 'master', if not itself named) is
+    # left alone, to avoid noise/side effects for repositories that don't
+    # use 'master' at all.
+    #
+    # Repositories are normally cloned with --single-branch, which narrows
+    # the origin remote's fetch refspec to just the branch used at clone
+    # time. A local-only check (e.g. grepping 'git branch -r') can then
+    # never see a branch that was published on the remote after that, so
+    # existence on the remote is always checked directly via
+    # 'git ls-remote', regardless of what has already been fetched locally.
+    for my $branch (@branches) {
+        my ( $lerr, $lout ) = run_command("cd -P '$repo_loc' && $git show-ref --verify --quiet refs/heads/$branch");
+        my $has_local_branch = !$lerr;
+
+        if ($has_local_branch) {
+            # case 1: bring the existing local branch up to date, briefly
+            # switching to it if necessary (restored at the end of this sub)
             ( $ierr, $out ) = run_command(
                             "cd -P '$repo_loc' && " .
                             "if [ xrefs/heads/$branch != x`$git symbolic-ref -q HEAD` ] ; then " .
@@ -1794,51 +2079,95 @@ sub git_update_repo {
                             "fi && " .
                             "$git pull --rebase origin $branch");
             if ($ierr) {
-                my $logmsg = "Could not update $git_repo. "
-                  . "Could not update branch $branch.";
+                my $logmsg = "Could not update $git_repo. Could not update branch $branch.";
                 WARN($logmsg);
                 ${ $updated_git_repos{$git_repo} } = -1;
                 lock( @components_error );
                 push( @components_error, $checkout );
                 return $ierr;
             }
-        } elsif ( `cd -P '$repo_loc' && $git branch -r` =~ /$branch/m ) {
-            # dealing with a remote tracking branch
-            ( $ierr, $out ) = run_command(
-                        "cd -P '$repo_loc' && " .
-                        "$git checkout --track -b $branch origin/$branch");
+            next;
+        }
+
+        ( $ierr, $out ) = run_command("cd -P '$repo_loc' && $git ls-remote --exit-code --heads origin '$branch'");
+        my $is_remote_branch = !$ierr;
+        my $is_remote_tag = 0;
+        unless ($is_remote_branch) {
+            ( $ierr, $out ) = run_command("cd -P '$repo_loc' && $git ls-remote --exit-code --tags origin '$branch'");
+            $is_remote_tag = !$ierr;
+        }
+
+        if ($is_remote_branch) {
+            # case 2: create a local branch pinned to the fetched commit,
+            # without switching to it. A plain 'git branch' is used instead
+            # of '--track'/'checkout --track', since git refuses to set up
+            # tracking metadata for a ref that is not part of the remote's
+            # configured (narrowed, single-branch) fetch refspec, even
+            # though the ref itself was just fetched successfully.
+            git_track_remote_ref( $repo_loc, "+refs/heads/$branch:refs/remotes/origin/$branch" );
+            ( $ierr, $out ) = run_command("cd -P '$repo_loc' && $git fetch origin '+$branch:refs/remotes/origin/$branch'");
             if ($ierr) {
-                my $logmsg = "Could not update $git_repo. "
-                  . "Could not create local branch for $branch.";
+                my $logmsg = "Could not update $git_repo. Could not fetch branch $branch.";
                 WARN($logmsg);
                 ${ $updated_git_repos{$git_repo} } = -1;
                 lock( @components_error );
                 push( @components_error, $checkout );
                 return $ierr;
             }
-        } # no need for else statement, do nothing for tags
+            ( $ierr, $out ) = run_command("cd -P '$repo_loc' && $git branch '$branch' 'refs/remotes/origin/$branch'");
+            if ($ierr) {
+                my $logmsg = "Could not update $git_repo. Could not create local branch for $branch.";
+                WARN($logmsg);
+                ${ $updated_git_repos{$git_repo} } = -1;
+                lock( @components_error );
+                push( @components_error, $checkout );
+                return $ierr;
+            }
+        }
+        elsif ($is_remote_tag) {
+            # case 3: an ET release published as a tag rather than a branch;
+            # create a same-named local branch pinned to it, without ever
+            # switching to it (tags never move, so this only happens once)
+            git_track_remote_ref( $repo_loc, "+refs/tags/$branch:refs/tags/$branch" );
+            ( $ierr, $out ) = run_command("cd -P '$repo_loc' && $git fetch origin 'refs/tags/$branch:refs/tags/$branch'");
+            if ($ierr) {
+                my $logmsg = "Could not update $git_repo. Could not fetch tag $branch.";
+                WARN($logmsg);
+                ${ $updated_git_repos{$git_repo} } = -1;
+                lock( @components_error );
+                push( @components_error, $checkout );
+                return $ierr;
+            }
+            ( $ierr, $out ) = run_command("cd -P '$repo_loc' && $git branch '$branch' 'refs/tags/$branch'");
+            if ($ierr) {
+                my $logmsg = "Could not update $git_repo. Could not create local branch for tag $branch.";
+                WARN($logmsg);
+                ${ $updated_git_repos{$git_repo} } = -1;
+                lock( @components_error );
+                push( @components_error, $checkout );
+                return $ierr;
+            }
+        }
+        # else: neither a branch nor a tag on origin -- nothing to do
     }
-    
-    # now checkout original branch if required
+
+    # restore whatever branch was checked out before this update ran
     ( $ierr, $out ) = run_command(
                 "cd -P '$repo_loc' && " .
                 "if [ xrefs/heads/$current_branch != x`$git symbolic-ref -q HEAD` ] ; then " .
                 "  $git checkout $current_branch ; " .
                 "fi");
     if ($ierr) {
-        my $logmsg = "Could not update $git_repo. "
-          . "Could not checkout original branch.";
+        my $logmsg = "Could not update $git_repo. Could not checkout original branch.";
         WARN($logmsg);
         ${ $updated_git_repos{$git_repo} } = -1;
         lock( @components_error );
         push( @components_error, $checkout );
         return $ierr;
     }
-    
-    ${ $updated_git_repos{$git_repo} } = 1
-      unless ${ $updated_git_repos{$git_repo} } == -1;
-    
-    return $ierr;
+
+    ${ $updated_git_repos{$git_repo} } = 1 unless ${ $updated_git_repos{$git_repo} } == -1;
+    return 0;
 }
 
 sub handle_curl {
@@ -2605,10 +2934,19 @@ sub print_update_info {
 sub print_summary {
     return if $DEBUG;
 
+    my $total_to_update = 0;
+    $total_to_update += scalar( @{$_} ) foreach values %components_to_update;
+    my $not_updated = $total_to_update - $update_size;
+    $not_updated = 0 if $not_updated < 0;
+
     print "-----------------------------------------------------------------\n";
     if ( @components_error == 0 ) {
         print "  $checkout_size components checked out successfully.\n";
-        print "  $update_size components updated successfully.\n\n";
+        print "  $update_size components updated successfully.\n";
+        print "  $not_updated components not updated.\n";
+        print "  Branch switches -- gentle: $switch_success / forced: $switch_forced / aborted: $switch_aborted / ignored: $switch_ignored\n"
+          if $SWITCH_BRANCH;
+        print "\n";
         my $logmsg = "Updated from thornlist(s): ";
         $logmsg .= join( ' , ', @ORIG_LISTS );
 
@@ -2616,7 +2954,11 @@ sub print_summary {
     }
     else {
         print "  $checkout_size components checked out.\n";
-        print "  $update_size components updated.\n\n";
+        print "  $update_size components updated.\n";
+        print "  $not_updated components not updated.\n";
+        print "  Branch switches -- gentle: $switch_success / forced: $switch_forced / aborted: $switch_aborted / ignored: $switch_ignored\n"
+          if $SWITCH_BRANCH;
+        print "\n";
         foreach my $error (sort uniq( @components_error ) ) {
             print "  Unable to process $error\n";
         }
@@ -2729,6 +3071,15 @@ Options:
 
     --[no]shallow   force shallow clones for git repositories
 
+    --[no]switch-branch
+                    when updating, gently switch git repositories to the
+                    branch given in the thornlist (!REPO_BRANCH), only if
+                    currently on the branch the previous thornlist requested
+
+    --[no]force-switch-branch
+                    like --switch-branch, but attempt the switch regardless
+                    of the branch currently checked out (implies --switch-branch)
+
     --reset-authentication
                     delete authentication files
 
@@ -2793,6 +3144,43 @@ svn, and mercurial.
 Force GetComponents to add '--depth 1' to all 'git clone' commands. This will 
 reduce the size of all git repositories by ignoring the repository history. 
 Equivalent options are used for darcs.
+
+=item B<--[no]switch-branch>
+
+When updating an existing git checkout, normally GetComponents leaves the
+repository on whatever branch was already checked out locally, only making
+sure that the branch named by !REPO_BRANCH in the thornlist exists and is up
+to date. With --switch-branch ('gentle' switching), GetComponents will
+instead check out that branch (e.g. after bumping !REPO_BRANCH = $ET_RELEASE
+to a new release), so long-lived local checkouts can be moved onto the new
+release branch without having to set up a fresh Cactus directory -- but only
+for repositories currently on the branch requested by the previously used
+thornlist (found under the COMPONENTLIST_TARGET directory, e.g.
+Cactus/thornlists/). A repository sitting on some other, manually checked
+out branch (e.g. a feature branch) is left untouched.
+
+If the checkout cannot be switched cleanly (for example because of local
+changes that could not be stashed, or a diverged branch), GetComponents warns
+and leaves the repository on its current branch for manual resolution,
+similar to how a mismatched repository URL is handled.
+
+A summary line reports how many repositories were switched gently, how many
+required --force-switch-branch, how many switches were aborted due to a
+conflict, and how many were left alone (gentle mode only).
+
+=item B<--[no]force-switch-branch>
+
+Like --switch-branch (which it implies), but attempts the switch for every
+repository whose current branch differs from the one requested by the
+thornlist, regardless of what that current branch is or where it came from.
+As with --switch-branch, a switch that cannot complete cleanly is aborted
+and reported rather than forced through a conflict.
+
+Because pre-existing checkouts may be sitting on branches that match neither
+the previous nor the new thornlist (this is normal for older workspaces
+predating this feature), a first run with --force-switch-branch may be
+needed before --switch-branch's gentler, more conservative rules become
+useful for a given workspace.
 
 =item B<--reset-authentication>
 
